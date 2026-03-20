@@ -1,0 +1,4 @@
+interface:
+  display_name: "Experiment Design"
+  short_description: "Design minimal runs that change decisions"
+  default_prompt: "Use $experiment-design to design the smallest experiment that cleanly separates the important hypotheses."

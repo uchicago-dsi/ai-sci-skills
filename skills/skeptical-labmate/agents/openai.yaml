@@ -1,0 +1,4 @@
+interface:
+  display_name: "Skeptical Labmate"
+  short_description: "Stress-test scientific claims and plans"
+  default_prompt: "Use $skeptical-labmate to review this claim or proposed next step before trusting it."

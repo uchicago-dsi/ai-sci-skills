@@ -1,0 +1,4 @@
+interface:
+  display_name: "Job Babysitting"
+  short_description: "Monitor jobs, detect stalls, triage failures"
+  default_prompt: "Use $job-babysitting to monitor a long-running job, detect stalls, and decide the next action."

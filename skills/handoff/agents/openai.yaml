@@ -1,0 +1,4 @@
+interface:
+  display_name: "Handoff"
+  short_description: "Create restart-ready handoff notes"
+  default_prompt: "Use $handoff to write a concise restart-ready handoff for this work."

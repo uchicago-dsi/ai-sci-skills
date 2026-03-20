@@ -1,0 +1,4 @@
+interface:
+  display_name: "Sensemaking"
+  short_description: "Make findings cohere before trusting them"
+  default_prompt: "Use $sensemaking to test whether findings make sense, compare them to the nearest reference, and decide what they imply."

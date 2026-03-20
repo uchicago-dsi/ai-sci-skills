@@ -1,0 +1,4 @@
+interface:
+  display_name: "Lab Notebook"
+  short_description: "Log work with evidence and decision impact"
+  default_prompt: "Use $lab-notebook to record work in a notebook so it is easy to resume and easy to trust later."

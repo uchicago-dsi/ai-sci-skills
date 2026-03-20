@@ -1,0 +1,4 @@
+interface:
+  display_name: "Slurm Ops"
+  short_description: "Submit, inspect, and debug Slurm jobs"
+  default_prompt: "Use $slurm to submit, inspect, or debug a Slurm job safely."

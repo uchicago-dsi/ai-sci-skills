@@ -1,0 +1,4 @@
+interface:
+  display_name: "Bounded Auto Loop"
+  short_description: "Run a short autonomous loop with stop rules"
+  default_prompt: "Use $bounded-auto-loop to run a short autonomous debugging or experiment loop with a clear stop rule."

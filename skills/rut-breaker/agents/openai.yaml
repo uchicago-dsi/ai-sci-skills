@@ -1,0 +1,4 @@
+interface:
+  display_name: "Rut Breaker"
+  short_description: "Detect loops and force a better reset"
+  default_prompt: "Use $rut-breaker to identify a low-yield loop, surface the stuck assumption, and choose a better reset move."

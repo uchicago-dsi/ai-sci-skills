@@ -1,0 +1,24 @@
+<div id="deck-logos">
+  <img src="logos/primary.svg" alt="Primary organization logo">
+  <img src="logos/secondary.svg" alt="Secondary organization logo">
+</div>
+
+<style>
+/* PDF export only: Chrome paints position:fixed elements above page content, so
+   a slide number placed on the fixed bottom panel can disappear. In print mode
+   hide the fixed panel and redraw it as page content on every .pdf-page. */
+html.print-pdf #deck-logos { display: none !important; }
+html.print-pdf .pdf-page::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: var(--deck-logo-bar-height, 64px);
+  background-color: #fff;
+  background-image: url("logos/primary.svg"), url("logos/secondary.svg");
+  background-repeat: no-repeat, no-repeat;
+  background-position: 32px center, right 32px center;
+  background-size: auto var(--deck-logo-height, 38px), auto var(--deck-logo-height, 38px);
+  border-top: 3px solid var(--deck-accent, #1f4e79);
+  z-index: 40;
+}
+</style>

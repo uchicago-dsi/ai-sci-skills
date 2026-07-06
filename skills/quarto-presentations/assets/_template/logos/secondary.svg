@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 80" role="img" aria-labelledby="title desc">
+  <title id="title">Secondary Organization Placeholder</title>
+  <desc id="desc">Replace this SVG with a secondary organization logo.</desc>
+  <rect width="360" height="80" fill="none"/>
+  <circle cx="34" cy="40" r="27" fill="#0f766e"/>
+  <path d="M22 42l9 9 17-24" fill="none" stroke="#ffffff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="78" y="35" font-family="Helvetica Neue, Arial, sans-serif" font-size="22" font-weight="700" fill="#1f2937">Secondary</text>
+  <text x="78" y="58" font-family="Helvetica Neue, Arial, sans-serif" font-size="20" fill="#475569">Organization</text>
+</svg>

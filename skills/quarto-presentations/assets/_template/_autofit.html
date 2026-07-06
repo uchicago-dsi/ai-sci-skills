@@ -1,0 +1,62 @@
+<!-- Auto-fit overfull slides after reveal.js lays them out.
+     Slides that already fit are untouched. Add {.no-autofit} to a slide to skip.
+     Keep --deck-bottom-safe in custom.scss aligned with the bottom logo panel. -->
+<script>
+(function () {
+  var FALLBACK_SLIDE_H = 720;
+  var FALLBACK_SAFE = 84;
+
+  function numericCssVar(name, fallback) {
+    var raw = getComputedStyle(document.documentElement).getPropertyValue(name);
+    var value = parseFloat(raw);
+    return Number.isFinite(value) ? value : fallback;
+  }
+
+  function slideHeight() {
+    if (window.Reveal && Reveal.getConfig && Reveal.getConfig().height) {
+      return Number(Reveal.getConfig().height);
+    }
+    return FALLBACK_SLIDE_H;
+  }
+
+  function fitSection(section) {
+    if (section.id === 'title-slide') return;
+    if (section.classList.contains('no-autofit')) return;
+    if (section.querySelector(':scope > section')) return;
+
+    var wrapper = section.querySelector(':scope > .autofit-inner');
+    if (!wrapper) {
+      wrapper = document.createElement('div');
+      wrapper.className = 'autofit-inner';
+      while (section.firstChild) wrapper.appendChild(section.firstChild);
+      section.appendChild(wrapper);
+    }
+
+    var available = slideHeight() - numericCssVar('--deck-bottom-safe', FALLBACK_SAFE);
+    wrapper.style.zoom = '1';
+    var height = wrapper.offsetHeight;
+    if (height > available) {
+      wrapper.style.zoom = (available / height).toFixed(4);
+    }
+  }
+
+  function fitAll() {
+    document.querySelectorAll('.reveal .slides section').forEach(fitSection);
+  }
+
+  function boot() {
+    fitAll();
+    if (window.Reveal && Reveal.on) {
+      Reveal.on('ready', fitAll);
+      Reveal.on('slidechanged', fitAll);
+      Reveal.on('resize', fitAll);
+    }
+    window.addEventListener('resize', fitAll);
+    setTimeout(fitAll, 250);
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
+  window.addEventListener('load', fitAll);
+})();
+</script>

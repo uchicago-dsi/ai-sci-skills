@@ -1,0 +1,76 @@
+---
+title: "Talk Title"
+subtitle: "One-line subtitle"
+author: "Your Name"
+date: today
+format:
+  revealjs:
+    theme: [default, custom.scss]
+    width: 1280
+    height: 720
+    slide-number: c/t
+    incremental: false
+    code-line-numbers: false
+    include-after-body:
+      - _logos.html
+      - _autofit.html
+execute:
+  echo: false
+  freeze: auto
+---
+
+# Section Divider
+
+## Main Claim
+
+The headline claim goes here, stated plainly.
+
+- First point
+- Second point
+- Third point
+
+. . .
+
+A punchline that appears after a pause.
+
+::: {.notes}
+Speaker notes go here.
+:::
+
+## Two Columns
+
+::: {.columns}
+::: {.column width="50%"}
+**Left**
+
+- Point
+- Point
+:::
+::: {.column width="50%"}
+**Right**
+
+- Point
+- Point
+:::
+:::
+
+## Figure Slide
+
+<!-- Put finished figures under ./figures/ and reference them here.
+     Replace logos/primary.svg and logos/secondary.svg with local brand assets
+     to customize the bottom panel. -->
+<!-- ![](figures/example.png){.nostretch width="76%" fig-align="center"} -->
+
+Reference finished sidecar figures from `figures/`; do not run heavy analysis in the deck.
+
+# Takeaways
+
+## If You Remember Three Things
+
+1. **First.** One line.
+2. **Second.** One line.
+3. **Third.** One line.
+
+. . .
+
+Questions?

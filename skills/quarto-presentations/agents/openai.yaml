@@ -1,0 +1,4 @@
+interface:
+  display_name: "Quarto Slides"
+  short_description: "Build and export Quarto reveal.js decks"
+  default_prompt: "Use $quarto-presentations to create, edit, render, or export a Quarto reveal.js slide deck."

@@ -15,6 +15,7 @@ Each skill is intentionally compact. The shared versions encode decision rules a
 | `sensemaking` | Check whether a finding makes sense before trusting it |
 | `skeptical-labmate` | Stress-test claims, baselines, and follow-up plans |
 | `lab-notebook` | Keep records restartable and auditable |
+| `quarto-presentations` | Create, render, check, and export Quarto reveal.js slide decks |
 | `job-babysitting` | Classify job health and choose the next action |
 | `rut-breaker` | Detect low-yield loops and force a better reset move |
 | `handoff` | Create restart-ready session handoffs |
@@ -145,7 +146,7 @@ short local Slurm site note in docs/slurm-site.md with only the durable facts
 that change launch decisions.
 ```
 
-The detailed bootstrap workflow lives in [skills/slurm/references/bootstrap.md](/home/annawoodard/ai-sci-skills/skills/slurm/references/bootstrap.md).
+The detailed bootstrap workflow lives in [skills/slurm/references/bootstrap.md](skills/slurm/references/bootstrap.md).
 
 ## Contributing
 

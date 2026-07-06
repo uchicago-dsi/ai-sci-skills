@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 80" role="img" aria-labelledby="title desc">
+  <title id="title">Primary Organization Placeholder</title>
+  <desc id="desc">Replace this SVG with a primary organization logo.</desc>
+  <rect width="360" height="80" fill="none"/>
+  <rect x="4" y="12" width="56" height="56" rx="8" fill="#1f4e79"/>
+  <path d="M19 52h26M19 40h26M19 28h26" stroke="#ffffff" stroke-width="5" stroke-linecap="round"/>
+  <text x="78" y="35" font-family="Helvetica Neue, Arial, sans-serif" font-size="22" font-weight="700" fill="#1f2937">Primary</text>
+  <text x="78" y="58" font-family="Helvetica Neue, Arial, sans-serif" font-size="20" fill="#475569">Organization</text>
+</svg>

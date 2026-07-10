@@ -39,13 +39,14 @@ python <skill-dir>/scripts/maintenance_inventory.py --top 40
 
 8. Use `git ls-files`, not broad `find`, to separate tracked maintenance targets from ignored local noise.
 9. Use `rg`, `git log`, configs, scripts, docs, notebooks, tests, run READMEs, and CI/workflow files to distinguish live paths from vestiges.
+10. For every deletion candidate, make an explicit liveness call: "active", "stale", "historical provenance", or "unclear". Do not treat a README mention, old notebook entry, or completed-run note as proof that code is live. Ask whether the reference is an instruction someone should still run today, a wrapper/config/import that executes the code, or just a historical record.
 
 ## Prefer High-Yield Categories
 
 Start with:
 
 - Least-recently-touched candidates: tracked files or directories whose most recent git commit touch was many months/years ago, especially scripts, launchers, configs, docs, and one-off analyses with no current references.
-- Dead entrypoints: unreferenced scripts, CLIs, launchers, notebooks, or wrappers for retired mechanisms.
+- Dead or stale entrypoints: scripts, CLIs, launchers, notebooks, or wrappers that are unreferenced, referenced only by stale docs, or tied to retired mechanisms.
 - Duplicate owners: repeated loaders, writers, path builders, manifest parsing, plotting, checkpointing, metrics, config parsing, or shell wrapper patterns where a shared owner already exists.
 - Failed-path residue: compatibility shims, silent fallbacks, duplicate control paths, old config branches, or experiment families explicitly marked retired.
 - Large isolated files: high-LOC files with separable helpers that can be deleted, moved to an existing owner, or split only when that reduces real coupling.
@@ -65,11 +66,12 @@ Before deleting or retiring code, gather enough evidence to explain why it is sa
 
 - Search by filename, function/class names, config keys, CLI names, run labels, and output paths.
 - Check package code, scripts, configs, docs, notebooks, tests, CI/workflows, scheduler wrappers, and run/provenance notes.
+- Classify references by strength. Strong live evidence includes package imports, scheduler wrappers, CI/tests, active configs, current runbooks, and generated manifests that execute or require the target. Weak evidence includes README catalog entries, old examples, historical lab notebooks, completed-run READMEs, stale TODOs, and provenance logs; these should trigger doc cleanup or deeper reasoning, not automatic preservation.
 - Inspect `git log -- <path>` and nearby comments for ownership/history.
 - Confirm there is a surviving owner or replacement path when removing a duplicate.
 - Confirm the target is not source data, experiment provenance, a completed-run record, or an artifact family protected by local instructions.
 
-If evidence is mixed, mark the candidate as "retire later" or remove active references first. Do not delete code merely to reduce LOC.
+If evidence is mixed, decide whether the path is stale anyway. A stale script may still be named in a README; the maintenance task is to update or delete stale docs along with the code when the documented command is no longer current. Mark "retire later" only when there is real active-use uncertainty, not merely because a weak reference exists. Do not delete code merely to reduce LOC.
 
 ## Research-Code Guardrails
 

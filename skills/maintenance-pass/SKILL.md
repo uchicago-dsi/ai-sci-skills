@@ -41,6 +41,7 @@ python <skill-dir>/scripts/maintenance_inventory.py --top 40
 9. Use `rg`, `git log`, configs, scripts, docs, notebooks, tests, run READMEs, and CI/workflow files to distinguish live paths from vestiges.
 10. For every deletion candidate, make an explicit liveness call: "active", "stale", "historical provenance", or "unclear". Do not treat a README mention, old notebook entry, or completed-run note as proof that code is live. Ask whether the reference is an instruction someone should still run today, a wrapper/config/import that executes the code, or just a historical record.
 11. If local instructions or repo layout identify lab notebooks, experiment notes, run logs, or meeting notes, search them for the candidate file, mechanism name, run label, config slug, and nearby concepts. Use explicit notes such as "retired", "superseded by", "dead end", "do not reopen", "cancelled because", "failed because", and "decision impact" as stale-direction evidence, not automatic deletion authority.
+12. After low-hanging deletion passes, inspect ownership problems as first-class candidates: script-to-script private imports, duplicate package/local helper stacks, repeated dataclasses, and shared behavior that has no clear package owner.
 
 ## Prefer High-Yield Categories
 
@@ -49,6 +50,7 @@ Start with:
 - Least-recently-touched candidates: tracked files or directories whose most recent git commit touch was many months/years ago, especially scripts, launchers, configs, docs, and one-off analyses with no current references.
 - Dead or stale entrypoints: scripts, CLIs, launchers, notebooks, or wrappers that are unreferenced, referenced only by stale docs, or tied to retired mechanisms.
 - Duplicate owners: repeated loaders, writers, path builders, manifest parsing, plotting, checkpointing, metrics, config parsing, or shell wrapper patterns where a shared owner already exists.
+- Ownership consolidation: remove script-to-script private imports, duplicate dataclasses, and local helper stacks by moving live behavior to the canonical package owner and updating callers directly.
 - Failed-path residue: compatibility shims, silent fallbacks, duplicate control paths, old config branches, or experiment families explicitly marked retired.
 - Large isolated files: high-LOC files with separable helpers that can be deleted, moved to an existing owner, or split only when that reduces real coupling.
 - Tracked local artifacts: generated files, caches, copied outputs, debug dumps, or temporary files that do not belong in source.
@@ -94,6 +96,8 @@ Apply these defaults unless local instructions are stricter:
 - Prefer deleting an entire dead path over partially pruning internals.
 - Prefer extending an existing shared owner over adding a new abstraction.
 - Replace duplicate call sites when safe; leaving old and new paths side by side usually increases maintenance burden.
+- Before centralizing helper stacks, classify semantic variants: exact/simple readers, required/non-empty readers, optional-empty path resolvers, field-aware strict parsers, lenient parsers, and domain-specific slugs. Extend the right shared owner when semantics match; leave a domain API in place when it deliberately encodes different behavior.
+- Watch for shadowed helper names after mechanical rewrites, especially local functions renamed to shared helper names. Scan for remaining definitions and stale imports before validation.
 - Do not keep backwards-compatible aliases, shims, fallback flags, or duplicate names unless the user explicitly asks for a transition period. Favor one clear current interface.
 - When a refactor increases LOC, justify the increase in terms of reduced duplication, clearer ownership, or stronger contract enforcement.
 - Update active docs/config references that would otherwise point to removed code.
@@ -149,3 +153,4 @@ Lead with the maintenance result:
 - Evidence used to classify vestiges or duplicates.
 - Validation run and any failures or skipped checks.
 - Residual risk and the next 1-3 highest-yield maintenance candidates.
+- The single best next-pass recommendation, including target area, evidence or expected yield, risk, and validation scope. Always include this after a maintenance pass, even when not asked explicitly.

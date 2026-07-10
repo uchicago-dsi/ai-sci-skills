@@ -20,6 +20,7 @@ Each skill is intentionally compact. The shared versions encode decision rules a
 | `rut-breaker` | Detect low-yield loops and force a better reset move |
 | `handoff` | Create restart-ready session handoffs |
 | `bounded-auto-loop` | Run a short autonomous loop with a fixed budget and stop rule |
+| `maintenance-pass` | Trim dead code, vestiges, and duplication without churn |
 
 ## Installation
 
@@ -114,6 +115,7 @@ Use $sensemaking before you summarize these results.
 Use $experiment-design to propose the next minimal run matrix.
 Use $slurm to inspect why this job is pending.
 Use $handoff to write a restart-ready handoff.
+Use $maintenance-pass to trim safe, high-yield maintenance debt.
 ```
 
 ## Local adaptation

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Maintenance Pass"
+  short_description: "Prioritize safe code cleanup"
+  default_prompt: "Use $maintenance-pass to run a safe, high-yield code maintenance pass."

@@ -12,8 +12,10 @@ Prioritize the safest change with the largest maintenance payoff. Delete or simp
 Use this rough ranking:
 
 ```text
-maintenance yield = impact * confidence / blast_radius
+maintenance yield = impact * confidence * age_signal / blast_radius
 ```
+
+Treat age as a triage signal, not proof. Code that has not been touched in a long time is more likely to be a vestige, duplicated old path, or stale interface, but stable core infrastructure can also be old and correct.
 
 ## Start With Evidence
 
@@ -26,21 +28,23 @@ git ls-files '*.py' | wc -l
 git ls-files '*.py' | xargs wc -l | tail -n 1
 ```
 
-4. If the user gives a target LOC change, treat it as a stopping target, not a quota. Aim for the target with the safest high-yield changes first, but stop short when the next candidate has weak evidence or excessive blast radius. Do not pad the diff with formatting, moves, or speculative rewrites to hit the number.
-5. Create a pre-pass commit boundary before editing. If the worktree is clean, make a checkpoint commit, using an empty commit only when the user explicitly requested before/after commits. If the worktree is dirty, do not silently commit unrelated or user-owned changes; either commit only the already-approved scoped changes, make an empty checkpoint commit, or ask before including preexisting work. Record any skipped checkpoint and why.
-6. Optionally run the bundled inventory helper from the repo root:
+4. Build an age-first candidate list from tracked files before choosing a theme. Prefer files and directories whose last meaningful touch is old, especially when they are scripts, one-off analyses, retired mechanism code, stale configs, duplicate helpers, or docs for old paths. Use `git log -1 --format='%ct %cs %h' -- <path>` or the inventory helper's oldest-file section. Do not use age alone to delete stable package owners, tests, schemas, or public APIs.
+5. If the user gives a target LOC change, treat it as a stopping target, not a quota. Aim for the target with the safest high-yield changes first, but stop short when the next candidate has weak evidence or excessive blast radius. Do not pad the diff with formatting, moves, or speculative rewrites to hit the number.
+6. Create a pre-pass commit boundary before editing. If the worktree is clean, make a checkpoint commit, using an empty commit only when the user explicitly requested before/after commits. If the worktree is dirty, do not silently commit unrelated or user-owned changes; either commit only the already-approved scoped changes, make an empty checkpoint commit, or ask before including preexisting work. Record any skipped checkpoint and why.
+7. Optionally run the bundled inventory helper from the repo root:
 
 ```bash
 python <skill-dir>/scripts/maintenance_inventory.py --top 40
 ```
 
-7. Use `git ls-files`, not broad `find`, to separate tracked maintenance targets from ignored local noise.
-8. Use `rg`, `git log`, configs, scripts, docs, notebooks, tests, run READMEs, and CI/workflow files to distinguish live paths from vestiges.
+8. Use `git ls-files`, not broad `find`, to separate tracked maintenance targets from ignored local noise.
+9. Use `rg`, `git log`, configs, scripts, docs, notebooks, tests, run READMEs, and CI/workflow files to distinguish live paths from vestiges.
 
 ## Prefer High-Yield Categories
 
 Start with:
 
+- Old untouched candidates: tracked files or directories not touched for many months/years, especially old scripts, launchers, configs, docs, and one-off analyses with no current references.
 - Dead entrypoints: unreferenced scripts, CLIs, launchers, notebooks, or wrappers for retired mechanisms.
 - Duplicate owners: repeated loaders, writers, path builders, manifest parsing, plotting, checkpointing, metrics, config parsing, or shell wrapper patterns where a shared owner already exists.
 - Failed-path residue: compatibility shims, silent fallbacks, duplicate control paths, old config branches, or experiment families explicitly marked retired.

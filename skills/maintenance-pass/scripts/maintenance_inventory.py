@@ -36,6 +36,15 @@ def line_count(path: Path) -> int:
         return sum(1 for _ in handle)
 
 
+def last_commit(root: Path, path: Path) -> tuple[int, str, str]:
+    rel = path.relative_to(root)
+    output = run_git(root, ["log", "-1", "--format=%ct\t%cs\t%h", "--", str(rel)]).strip()
+    if not output:
+        return 0, "", ""
+    epoch_text, date_text, commit = (output.split("\t", 2) + ["", ""])[:3]
+    return int(epoch_text or "0"), date_text, commit
+
+
 def bucket_for(path: Path, root: Path) -> str:
     rel = path.relative_to(root)
     parts = rel.parts
@@ -50,6 +59,7 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--root", default=".", help="repo root; defaults to cwd")
     parser.add_argument("--top", type=int, default=30, help="number of large files to show")
+    parser.add_argument("--oldest", type=int, default=30, help="number of oldest touched Python files to show")
     args = parser.parse_args()
 
     root = Path(args.root).resolve()
@@ -91,6 +101,17 @@ def main() -> int:
     print("|---:|---|")
     for count, path in counts[: args.top]:
         print(f"| {count} | `{path.relative_to(root)}` |")
+    print()
+    print(f"## Oldest {min(args.oldest, len(counts))} Python Files By Last Commit")
+    print()
+    print("| Last commit date | Commit | LOC | Path |")
+    print("|---|---|---:|---|")
+    ages = []
+    for count, path in counts:
+        epoch, date_text, commit = last_commit(root, path)
+        ages.append((epoch, date_text, commit, count, path))
+    for _epoch, date_text, commit, count, path in sorted(ages)[: args.oldest]:
+        print(f"| {date_text or 'unknown'} | `{commit or 'unknown'}` | {count} | `{path.relative_to(root)}` |")
     return 0
 
 

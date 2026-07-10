@@ -30,7 +30,7 @@ git ls-files '*.py' | xargs wc -l | tail -n 1
 
 4. Build a least-recently-touched candidate list from tracked files before choosing a theme. Prefer files and directories whose most recent git commit touch is old, especially when they are scripts, one-off analyses, retired mechanism code, stale configs, duplicate helpers, or docs for old paths. Use `git log -1 --format='%ct %cs %h' -- <path>` or the inventory helper's least-recently-touched section. Do not use last-touch age alone to delete stable package owners, tests, schemas, or public APIs.
 5. If the user gives a target LOC change, treat it as a stopping target, not a quota. Aim for the target with the safest high-yield changes first, but stop short when the next candidate has weak evidence or excessive blast radius. Do not pad the diff with formatting, moves, or speculative rewrites to hit the number.
-6. Create a pre-pass commit boundary before editing. If the worktree is clean, make a checkpoint commit, using an empty commit only when the user explicitly requested before/after commits. If the worktree is dirty, do not silently commit unrelated or user-owned changes; either commit only the already-approved scoped changes, make an empty checkpoint commit, or ask before including preexisting work. Record any skipped checkpoint and why.
+6. Establish a pre-pass commit boundary before editing without creating empty commits. If the worktree is clean, record the current `HEAD` as the starting boundary instead of making an empty checkpoint. If the worktree is dirty, do not silently commit unrelated or user-owned changes; either commit only already-approved scoped changes as a real pre-pass checkpoint, or record the current `HEAD` plus the dirty status as the boundary. If the user explicitly asks for before/after commits but there is nothing real to checkpoint before the pass, report that the starting boundary is the existing `HEAD`; do not make an empty commit.
 7. Optionally run the bundled inventory helper from the repo root:
 
 ```bash
@@ -137,14 +137,14 @@ After validation, commit the completed pass before reporting final status.
 - Stage only files changed for this maintenance pass. Do not sweep unrelated dirty worktree changes into the commit.
 - Use a concise maintenance commit message naming the theme, such as `chore: remove retired training entrypoints` or `refactor: centralize artifact writers`.
 - If validation fails and cannot be fixed quickly, do not commit a broken pass unless the user explicitly asks for a checkpoint; report the failure and leave the diff unstaged or clearly scoped.
-- Keep the pre-pass checkpoint and post-pass change commit separate so future agents can diff exactly what the pass did.
+- Keep any real pre-pass checkpoint and the post-pass change commit separate so future agents can diff exactly what the pass did. When no real pre-pass checkpoint is needed, use the recorded starting `HEAD` as the before boundary.
 
 ## Report
 
 Lead with the maintenance result:
 
 - Files deleted, merged, or refactored.
-- Commit hashes for the pre-pass checkpoint and post-pass change commit, or the reason either boundary was skipped.
+- Commit hashes for the starting boundary and post-pass change commit. State whether the starting boundary was an existing `HEAD` or a real pre-pass checkpoint; do not create or report empty checkpoint commits.
 - Net LOC/file-count change using the same baseline commands.
 - Evidence used to classify vestiges or duplicates.
 - Validation run and any failures or skipped checks.

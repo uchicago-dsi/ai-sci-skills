@@ -40,6 +40,7 @@ python <skill-dir>/scripts/maintenance_inventory.py --top 40
 8. Use `git ls-files`, not broad `find`, to separate tracked maintenance targets from ignored local noise.
 9. Use `rg`, `git log`, configs, scripts, docs, notebooks, tests, run READMEs, and CI/workflow files to distinguish live paths from vestiges.
 10. For every deletion candidate, make an explicit liveness call: "active", "stale", "historical provenance", or "unclear". Do not treat a README mention, old notebook entry, or completed-run note as proof that code is live. Ask whether the reference is an instruction someone should still run today, a wrapper/config/import that executes the code, or just a historical record.
+11. If local instructions or repo layout identify lab notebooks, experiment notes, run logs, or meeting notes, search them for the candidate file, mechanism name, run label, config slug, and nearby concepts. Use explicit notes such as "retired", "superseded by", "dead end", "do not reopen", "cancelled because", "failed because", and "decision impact" as stale-direction evidence, not automatic deletion authority.
 
 ## Prefer High-Yield Categories
 
@@ -67,6 +68,7 @@ Before deleting or retiring code, gather enough evidence to explain why it is sa
 - Search by filename, function/class names, config keys, CLI names, run labels, and output paths.
 - Check package code, scripts, configs, docs, notebooks, tests, CI/workflows, scheduler wrappers, and run/provenance notes.
 - Classify references by strength. Strong live evidence includes package imports, scheduler wrappers, CI/tests, active configs, current runbooks, and generated manifests that execute or require the target. Weak evidence includes README catalog entries, old examples, historical lab notebooks, completed-run READMEs, stale TODOs, and provenance logs; these should trigger doc cleanup or deeper reasoning, not automatic preservation.
+- Use lab notebooks to answer whether a scientific direction was abandoned, replaced, or protected. Do not use them alone to decide whether a file is safe to delete: failed experiments may leave reusable infrastructure, and active mechanisms may have old failure notes for earlier versions.
 - Inspect `git log -- <path>` and nearby comments for ownership/history.
 - Confirm there is a surviving owner or replacement path when removing a duplicate.
 - Confirm the target is not source data, experiment provenance, a completed-run record, or an artifact family protected by local instructions.

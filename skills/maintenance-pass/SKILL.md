@@ -26,14 +26,16 @@ git ls-files '*.py' | wc -l
 git ls-files '*.py' | xargs wc -l | tail -n 1
 ```
 
-4. Optionally run the bundled inventory helper from the repo root:
+4. If the user gives a target LOC change, treat it as a stopping target, not a quota. Aim for the target with the safest high-yield changes first, but stop short when the next candidate has weak evidence or excessive blast radius. Do not pad the diff with formatting, moves, or speculative rewrites to hit the number.
+5. Create a pre-pass commit boundary before editing. If the worktree is clean, make a checkpoint commit, using an empty commit only when the user explicitly requested before/after commits. If the worktree is dirty, do not silently commit unrelated or user-owned changes; either commit only the already-approved scoped changes, make an empty checkpoint commit, or ask before including preexisting work. Record any skipped checkpoint and why.
+6. Optionally run the bundled inventory helper from the repo root:
 
 ```bash
 python <skill-dir>/scripts/maintenance_inventory.py --top 40
 ```
 
-5. Use `git ls-files`, not broad `find`, to separate tracked maintenance targets from ignored local noise.
-6. Use `rg`, `git log`, configs, scripts, docs, notebooks, tests, run READMEs, and CI/workflow files to distinguish live paths from vestiges.
+7. Use `git ls-files`, not broad `find`, to separate tracked maintenance targets from ignored local noise.
+8. Use `rg`, `git log`, configs, scripts, docs, notebooks, tests, run READMEs, and CI/workflow files to distinguish live paths from vestiges.
 
 ## Prefer High-Yield Categories
 
@@ -119,11 +121,21 @@ Avoid adding heavyweight, GPU-dependent, network-dependent, or cluster-scale che
 
 Always recompute the same LOC/file-count baseline after the pass and report the delta.
 
+## Commit The Pass
+
+After validation, commit the completed pass before reporting final status.
+
+- Stage only files changed for this maintenance pass. Do not sweep unrelated dirty worktree changes into the commit.
+- Use a concise maintenance commit message naming the theme, such as `chore: remove retired training entrypoints` or `refactor: centralize artifact writers`.
+- If validation fails and cannot be fixed quickly, do not commit a broken pass unless the user explicitly asks for a checkpoint; report the failure and leave the diff unstaged or clearly scoped.
+- Keep the pre-pass checkpoint and post-pass change commit separate so future agents can diff exactly what the pass did.
+
 ## Report
 
 Lead with the maintenance result:
 
 - Files deleted, merged, or refactored.
+- Commit hashes for the pre-pass checkpoint and post-pass change commit, or the reason either boundary was skipped.
 - Net LOC/file-count change using the same baseline commands.
 - Evidence used to classify vestiges or duplicates.
 - Validation run and any failures or skipped checks.

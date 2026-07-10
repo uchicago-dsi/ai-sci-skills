@@ -61,8 +61,6 @@ def main() -> int:
     parser.add_argument("--top", type=int, default=30, help="number of large files to show")
     parser.add_argument(
         "--least-recent",
-        "--oldest",
-        dest="least_recent",
         type=int,
         default=30,
         help="number of least recently touched Python files to show",

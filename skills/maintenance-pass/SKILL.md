@@ -90,6 +90,7 @@ Apply these defaults unless local instructions are stricter:
 - Prefer deleting an entire dead path over partially pruning internals.
 - Prefer extending an existing shared owner over adding a new abstraction.
 - Replace duplicate call sites when safe; leaving old and new paths side by side usually increases maintenance burden.
+- Do not keep backwards-compatible aliases, shims, fallback flags, or duplicate names unless the user explicitly asks for a transition period. Favor one clear current interface.
 - When a refactor increases LOC, justify the increase in terms of reduced duplication, clearer ownership, or stronger contract enforcement.
 - Update active docs/config references that would otherwise point to removed code.
 

@@ -1,0 +1,4 @@
+interface:
+  display_name: "PI Progress Synthesis"
+  short_description: "Build clear scientific progress updates"
+  default_prompt: "Use $pi-progress-synthesis to create a concise scientific update with evidence, caveats, and next decisions."

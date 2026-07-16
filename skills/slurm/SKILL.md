@@ -8,14 +8,14 @@ description: "Inspect queue state, submit or cancel jobs, debug sbatch and submi
 ## Use It As A Platform Skill
 
 - Assume repo and workspace policy has already been loaded into context.
-- Honor the active manual-mode, quota, logging, and handoff rules for the current workspace.
+- Honor the active authorization, quota, logging, and handoff rules for the current workspace.
 - Keep heavy compute off the headnode. Inspect files, edit code, and submit or monitor jobs from the headnode; run real compute on Slurm nodes only.
 - Compose this skill with repo or experiment skills. Let them define intent; use this skill for scheduler choices and failure triage.
 
 ## Use This Decision Ladder
 
-1. Discover the project’s `micromamba` env from existing repo conventions.
-2. Prefer the repo-native launcher, usually `submit.py` or another checked-in `submitit` entrypoint.
+1. Discover the project’s environment and command convention from local policy and existing launchers.
+2. Prefer the repo-native launcher, such as a checked-in workflow command, submission entrypoint, or scheduler wrapper.
 3. If cluster policy matters and no trustworthy local note exists, do a light bootstrap of the site facts.
 4. If QoS or partition policy matters, inspect the live scheduler limits instead of relying on memory.
 5. If no higher-level launcher exists, use the checked-in `sbatch` script or wrapper.
@@ -47,10 +47,9 @@ description: "Inspect queue state, submit or cancel jobs, debug sbatch and submi
 
 ## Discover The Environment
 
-- Assume each project has its own `micromamba` environment.
-- Prefer the env named by the current workspace policy or by the project’s existing command patterns.
-- If the env is not obvious, inspect nearby `AGENTS.md`, `README*`, `environment.yml`, `env*.yml`, `pyproject.toml`, or checked-in launcher scripts to see how the project already runs `python`, `pytest`, or submission commands.
-- Reuse the project’s existing `micromamba run -n <env> ...` convention instead of inventing a new env choice.
+- Prefer the environment and launcher named by the current workspace policy or existing command patterns.
+- If the environment is not obvious, inspect nearby `AGENTS.md`, `README*`, environment specifications, module files, container definitions, package metadata, or checked-in launcher scripts.
+- Reuse the project’s existing convention, whether it uses environment modules, a virtual environment, Conda or Mamba, a container, a workflow engine, or direct executables. Do not introduce a new environment manager merely to submit a job.
 
 ## Choose The Operation
 

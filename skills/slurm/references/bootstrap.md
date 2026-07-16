@@ -42,7 +42,7 @@ Check the existing repo conventions:
 
 - `AGENTS.md`
 - `README*`
-- `environment.yml` or `env*.yml`
+- environment specifications, module files, container definitions, or package metadata
 - `pyproject.toml`
 - launchers such as `submit.py`, `run_with_submitit.py`, `submit_*.sh`, or `Makefile`
 

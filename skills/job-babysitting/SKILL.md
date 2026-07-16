@@ -1,6 +1,6 @@
 ---
 name: job-babysitting
-description: "Monitor long-running jobs or pipelines, classify them as healthy, waiting, stalled, failed, completed, or unknown, and choose the next action. Use when the agent needs to babysit training runs, batch jobs, services, experiments, or scheduled work over time."
+description: "Directly monitor long-running jobs or pipelines, classify them as healthy, waiting, stalled, failed, completed, or unknown, and choose the next action. Use when the active agent needs to babysit training runs, batch jobs, services, experiments, or scheduled work over time."
 ---
 
 # Job Babysitting
@@ -10,6 +10,21 @@ description: "Monitor long-running jobs or pipelines, classify them as healthy, 
 - Babysitting means maintaining an evidence-backed view of whether work is progressing and intervening only when the evidence supports it.
 - Compose this skill with scheduler, experiment, or domain skills. Use those skills for platform-specific commands and this skill for monitoring logic.
 - Reuse the project's existing monitoring signals before inventing a new dashboard or parser.
+- The active agent owns the monitoring loop end to end. Do not hand the work to a separate service, timer, watcher, or one-off agent.
+
+## Run The Monitoring Loop Directly
+
+1. Define the requested terminal or decision condition.
+2. Define progress signals and their expected cadence before polling.
+3. Inspect scheduler or process state, then verify logs and expected artifacts.
+4. Classify the state and take only the proportionate next action.
+5. Report the evidence, wait for the next meaningful cadence, and repeat.
+
+- Continue until the terminal condition is met, the user stops monitoring, or a genuine blocker requires new authority or information.
+- Use native scheduler, process, log, and filesystem tools from the current session. Do not install or invoke a separate monitoring subsystem.
+- Keep healthy polls cheap. Read only new log output and changed artifacts instead of repeatedly rescanning complete run trees.
+- Preserve interventions and decision-changing results in the run README or routed lab notebook, not in a parallel monitoring ledger.
+- Do not spawn a persistent monitoring subagent unless the user explicitly requests delegated ownership.
 
 ## Use This Output Contract
 

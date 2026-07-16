@@ -18,10 +18,13 @@ When using this skill, structure the reasoning as:
 1. Observation: what happened.
 2. Expected: what you thought would happen instead.
 3. Nearest reference: the baseline, sibling case, prior run, known-good path, or control.
-4. Conclusion: the current best explanation or inference.
-5. Inference confidence: `low`, `medium`, or `high`.
-6. Falsifier: one observation that would seriously weaken that conclusion.
-7. Decision impact: what changes, or why nothing changes.
+4. Best explanation: the most plausible mechanism right now.
+5. Falsifier: one observation that would seriously weaken that explanation.
+6. Decision impact: what changes, or why nothing changes.
+7. Baseline disposition: whether the nearest valid baseline remains active or
+   has been superseded, and by what evidence.
+8. Falsification scope: the exact hypothesis or changed delta rejected, plus
+   the parent method or unchanged components that remain live.
 
 ## Apply These Rules
 
@@ -29,16 +32,23 @@ When using this skill, structure the reasoning as:
 - Compare against the nearest useful reference, not an abstract ideal.
 - Say why the chosen reference is the right baseline or control; if no fair baseline exists, weaken the conclusion.
 - Prefer mechanistic explanations over labels such as "noisy", "unstable", or "weird".
-- Keep confidence coarse: `low`, `medium`, or `high`, not fake precision.
-- Use confidence for the inference, not for the raw observation.
-- Let confidence reflect how likely the conclusion is to survive the nearest falsifier:
-  - `low`: plausible lead; do not trust it yet
-  - `medium`: current best explanation; enough to guide the next check
-  - `high`: strong enough to treat as working truth until contradicted
 - When the mechanism is spatial, temporal, structural, or artifact-like, inspect or create the nearest useful visual comparison instead of relying on scalar metrics alone.
 - Ask whether the finding is strong enough to change the next action.
 - If the result does not change the decision, say so explicitly.
 - If the result contradicts the current story, update the story.
+
+## Preserve The Best Baseline
+
+- Keep the best valid baseline active until a prospectively defined successor
+  beats it on the same decision readouts.
+- Attribute a failure only to what changed relative to that baseline. Failure
+  of an additive rescue rejects the rescue or combination, not the retained
+  baseline.
+- Before pivoting, name the baseline, changed delta, result, exact hypothesis
+  falsified, hypotheses not falsified, and retained active path.
+- Scope stop rules narrowly. Do not retire a successful parent method because
+  a broader extension or challenger failed unless that parent was directly
+  retested and failed.
 
 ## Sanity-Check Findings
 
@@ -53,7 +63,6 @@ When using this skill, structure the reasoning as:
 - Do not report a metric or image difference without saying what it means.
 - Do not prefer a summary metric over a decisive overlay, curve, slice, diff image, or side-by-side view when the mechanism is easier to see than describe.
 - Do not narrate confidence beyond what the evidence supports.
-- Do not assign confidence without first stating the inference.
 - Do not treat one surprising result as a new truth without comparison.
 - Do not stop at "better" or "worse"; say in what way and relative to what.
 

@@ -19,14 +19,13 @@ Before acting, answer:
 
 ## Find The Project Environment
 
-- Assume the repo has its own `micromamba` env.
-- Reuse the env from the project’s existing commands before guessing.
+- Reuse the environment and command style from the project’s existing launchers before guessing.
 - If the env is unclear, inspect nearby policy and project files in this order:
   - `AGENTS.md` or local instructions
   - `README*`
-  - `environment.yml` or `env*.yml`
+  - environment specifications, module files, container definitions, or package metadata
   - launcher scripts such as `submit.py`, `run_with_submitit.py`, `submit_*.sh`, or `Makefile`
-- Prefer copying a known-good command pattern such as `micromamba run -n <env> python submit.py ...`.
+- Prefer copying a known-good project command rather than introducing a new environment manager or activation path.
 
 For first-time cluster bootstrap, read `references/bootstrap.md`.
 
@@ -58,7 +57,7 @@ Choose a preemptible or overflow QoS only when it matches the workload:
 - the run is short, disposable, or easy to rerun
 - the job is a quick debug probe, smoke test, or one-off artifact build
 
-Prefer `general` for long, expensive, or interruption-sensitive work.
+Prefer the site's default non-preemptible tier for long, expensive, or interruption-sensitive work.
 
 ## Inspect Live Jobs
 

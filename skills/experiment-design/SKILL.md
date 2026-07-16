@@ -22,6 +22,8 @@ When proposing an experiment, report:
 5. Predicted outcomes by hypothesis.
 6. Readouts that will decide the result.
 7. Stop rule and follow-up rule.
+8. Baseline inheritance: what remains active if the candidate fails, and what
+   evidence would be required to supersede it.
 
 ## Apply These Rules
 
@@ -32,6 +34,13 @@ When proposing an experiment, report:
 - Use the nearest baseline, not a weak or outdated one.
 - If the baseline is unfair, stale, or confounded, fix that before treating the experiment as decision-worthy.
 - Prefer cheap discriminative checks before expensive cluster-scale runs.
+- Keep the best valid baseline as an explicit arm or immutable comparison until
+  a prospectively defined successor beats it on the same decision readouts.
+- For every candidate, identify the exact delta from the baseline and what
+  remains active if that delta fails.
+- Make stop rules hypothesis-scoped. Failure of an additive rescue or broader
+  variant retires that addition or combination, not an unchanged successful
+  parent method.
 
 ## Choose Readouts Carefully
 
@@ -53,6 +62,7 @@ When proposing an experiment, report:
 - State the exact runs to launch.
 - State what result would cause you to stop, continue, or pivot.
 - State what you are deliberately not running and why.
+- State the baseline disposition and exact falsification scope before pivoting.
 
 ## References
 

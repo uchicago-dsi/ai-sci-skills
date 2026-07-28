@@ -77,6 +77,10 @@ description: "Inspect queue state, submit or cancel jobs, debug sbatch and submi
 
 - Prefer repo-native submission entrypoints first, especially checked-in `submit.py` or other `submitit` launchers that encode resource defaults, output layout, validation, and run naming.
 - If no repo-native launcher exists, use the checked-in `sbatch` script or wrapper the project already uses.
+- Do not inherit an accelerator SKU merely because a parent or nearby run used
+  it. Use measured peak memory or the smallest real representative mechanics
+  run to establish the least restrictive compatible hardware, then compare
+  live priority routes for that hardware and any faster compatible accelerator.
 - Avoid ad hoc inline `sbatch --wrap` commands unless the repository already treats that pattern as standard for the task.
 - Capture the returned job ID. Prefer `sbatch --parsable` when the job ID must feed automation or notebook updates.
 - Record the exact launcher or script, config, and output path used for the submission so the run can be reconciled later.
@@ -86,6 +90,16 @@ description: "Inspect queue state, submit or cancel jobs, debug sbatch and submi
 
 - Some clusters expose a preemptible overflow tier such as `burst`, `scavenger`, `spot`, or `preempt`.
 - Treat any such tier as extra, interruptible capacity rather than the default place for important long runs.
+- Treat accelerator type and service class as separate choices. The same GPU
+  type may be available through both priority/non-preemptible and opportunistic
+  routes.
+- Before sending a requested accelerator to overflow, inspect live
+  partition/QoS associations and node GRES. Prefer a compatible
+  priority/non-preemptible route when the project is entitled to it.
+- Do not infer that direct priority capacity is unavailable merely because a
+  shared persistent-allocation broker has no active holder or slots. Check the
+  direct scheduler route independently; brokers and direct Slurm access are
+  distinct capacity surfaces.
 - Prefer the standard non-preemptible partition or QoS first when it is available.
 - Use preemptible capacity when:
   - standard capacity is full and you need overflow,

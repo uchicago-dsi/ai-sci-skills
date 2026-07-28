@@ -41,6 +41,19 @@ For each iteration:
 
 Do not queue multiple speculative branches at once unless they are independent and the stop rule still stays sharp.
 
+## Preserve The Active Window
+
+- Once a user starts a time- or iteration-bounded loop, keep the turn open until
+  the budget expires, the declared stop rule is met, a genuine user-only
+  blocker appears, or the user explicitly cancels or replaces the loop.
+- Treat later steering, priority changes, and status questions as additions to
+  the active loop unless the user clearly says they replace it. Answer them in
+  commentary and continue with the remaining budget.
+- Do not send a final response merely because one subrequest finishes, a worker
+  reaches a decision point, or an intermediate result is ready.
+- After every interruption or new message, recompute the remaining time or
+  iterations and resume the same loop.
+
 ## Stop Aggressively
 
 Stop early if:

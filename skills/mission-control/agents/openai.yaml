@@ -1,0 +1,4 @@
+interface:
+  display_name: "Mission Control"
+  short_description: "Supervise workers and apply steering in time"
+  default_prompt: "Use $mission-control to coordinate these workers, reconcile their state, and intervene before stale steering causes wasted work."

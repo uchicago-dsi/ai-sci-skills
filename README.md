@@ -17,6 +17,7 @@ Each skill is intentionally compact. The shared versions encode decision rules a
 | `lab-notebook` | Keep records restartable and auditable |
 | `quarto-presentations` | Create, render, check, and export Quarto reveal.js slide decks |
 | `job-babysitting` | Classify job health and choose the next action |
+| `mission-control` | Coordinate workers, reconcile steering, and intervene before directions become stale |
 | `rut-breaker` | Detect low-yield loops and force a better reset move |
 | `handoff` | Create restart-ready session handoffs |
 | `bounded-auto-loop` | Run a short autonomous loop with a fixed budget and stop rule |
@@ -115,6 +116,7 @@ Most agents will discover and invoke a skill automatically when the task matches
 Use $sensemaking before you summarize these results.
 Use $experiment-design to propose the next minimal run matrix.
 Use $slurm to inspect why this job is pending.
+Use $mission-control to coordinate these workers and reconcile queued steering.
 Use $handoff to write a restart-ready handoff.
 Use $maintenance-pass to trim safe, high-yield maintenance debt.
 ```

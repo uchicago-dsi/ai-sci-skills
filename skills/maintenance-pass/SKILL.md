@@ -43,6 +43,37 @@ python <skill-dir>/scripts/maintenance_inventory.py --top 40
 11. If local instructions or repo layout identify lab notebooks, experiment notes, run logs, or meeting notes, search them for the candidate file, mechanism name, run label, config slug, and nearby concepts. Use explicit notes such as "retired", "superseded by", "dead end", "do not reopen", "cancelled because", "failed because", and "decision impact" as stale-direction evidence, not automatic deletion authority.
 12. After low-hanging deletion passes, inspect ownership problems as first-class candidates: script-to-script private imports, duplicate package/local helper stacks, repeated dataclasses, and shared behavior that has no clear package owner.
 
+## Keep A Maintenance Notebook
+
+Resolve one maintenance notebook from the project root before the first material
+edit:
+
+1. Use a user-specified path or a repository/env routing rule only when it
+   explicitly accepts maintenance records.
+2. Otherwise reuse an existing project-local notebook only when its filename,
+   title, or current instructions explicitly dedicate it to maintenance
+   passes.
+3. If neither is available, use the fixed project-relative fallback
+   `docs/maintenance_notebook.md`. Derive its absolute path from the current
+   project root at runtime; never embed an absolute machine path.
+
+Do not choose an arbitrary notebook merely because it exists. If the fallback
+does not exist, create it with a `# Maintenance Notebook` heading, a one-line
+purpose, and a `## Chronology` section. Append one concise entry per completed
+pass with:
+
+- date and maintenance theme;
+- starting Git boundary and any pre-existing dirty scope;
+- tracked Python file and LOC counts before and after;
+- files or implementation families deleted, merged, or refactored;
+- liveness/duplication evidence used for the decision;
+- proportionate validation result; and
+- residual risk plus the best next-pass candidate.
+
+Keep the notebook project-relative and include it in the maintenance commit
+when repository policy permits. Follow stricter local notebook, provenance, and
+commit rules when present.
+
 ## Prefer High-Yield Categories
 
 Start with:

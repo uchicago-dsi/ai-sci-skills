@@ -37,6 +37,12 @@ Put the motivating failure before the proposed solution. When a simpler explanat
 
 ## Put Evidence Next To The Claim
 
+- Use a plot-rich default. Include several representative plots or image examples for every major empirical result, not a single hero example.
+- Cover multiple independent participants or sources and the major scientific strata when artifacts allow. Show typical, strong, borderline, and failure cases; state the selection rule and denominator so the gallery is not mistaken for a random or exhaustive sample.
+- Prefer compact small multiples or successive gallery slides when the representative set does not fit legibly on one slide. Do not drop visual evidence merely to keep the update short.
+- If a result has no eligible representative plots, say why and identify the exact visualization gap rather than presenting a plot-free claim as complete.
+- Typically include a detailed architecture diagram of the current system. Keep it faithful to the implementation and show the input contract, major representations and tensor shapes where useful, module boundaries, conditioning paths, objectives, outputs, and any material difference between training and inference.
+- Label proposed or inactive components distinctly from the executed path, and update or replace stale diagrams rather than presenting a historical architecture as current.
 - Show representative visual evidence inline when the claim is spatial, temporal, structural, or qualitative.
 - Include both a current positive example and a consequential failure example when sample quality affects the decision.
 - State clearly when a positive example is an upper bound, diagnostic bypass, or manually assisted result rather than the deployable path.

@@ -23,6 +23,26 @@ Inspect the worker's actual pane, log, job, or artifact before relying on its
 summary. Refresh this state after a user correction, completed experiment,
 failure, commit, submission, or other decision-changing event.
 
+## Keep The Mission State Disposable
+
+If the campaign needs a state file, make it a current-state dashboard, not a
+second lab notebook.
+
+- Update it in place; do not append chronology.
+- Keep it short, ideally under 80 lines. Delete resolved tasks, stale job states,
+  superseded corrections, and metrics that no longer affect a decision.
+- Include only the global objective and current decision, active baseline, worker
+  ownership and state, live jobs or indivisible operations, blockers, next
+  state-changing actions, and links to authoritative artifacts.
+- Store commands, detailed metrics, provenance, failures, and historical reasoning
+  in the lab notebook or experiment report. Link those records instead of copying
+  them.
+- If the dashboard starts accumulating history, rebuild it from current evidence
+  rather than editing the accumulated narrative.
+
+The lab notebook answers "what happened?" The mission-state file answers "what is
+true now, and what happens next?"
+
 ## Classify Every Steering Message
 
 Put steering in one of three classes:
@@ -101,6 +121,29 @@ authority.
 Avoid becoming a duplicate implementation worker when a focused worker can own
 the task. Small urgent cross-cutting fixes are appropriate when they unblock
 several streams or are faster to verify centrally.
+
+## Preserve Context Economically
+
+- Ask workers to return one compact envelope: state, decision-changing evidence,
+  blocker, next action, and artifact path. Put detailed logs and provenance in
+  files, not messages.
+- Send deltas to a worker's current directive. Reference the canonical queue,
+  mission state, or notebook instead of restating shared history.
+- Poll at the expected progress cadence or near a terminal event. On unchanged
+  state, say only that there is no state change; do not reproduce the queue or
+  prior metrics.
+- Read the smallest raw artifact slice that can change the classification. Use
+  targeted searches, short tails, and bounded tool output instead of loading
+  complete logs or result files.
+- Implement a shared cross-cutting fix once and have other workers cherry-pick the
+  exact commit rather than independently recreating it.
+- After context compaction or reassignment, re-enter from the mission state and
+  authoritative artifacts instead of reconstructing history from conversation.
+- When frequent user-facing updates are required, make unchanged-state updates as
+  short as possible while remaining truthful.
+
+Context economy never replaces direct verification of a decision-changing result,
+scheduler terminal state, safety condition, or artifact validity.
 
 ## Keep Goals And Plans At The Right Scale
 

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Research Code Parsimony"
+  short_description: "Reuse before adding research code"
+  default_prompt: "Use $research-code-parsimony to implement this change without adding a duplicate owner or leaving a superseded path behind."

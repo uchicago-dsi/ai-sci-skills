@@ -1,0 +1,4 @@
+interface:
+  display_name: "Claude Code Worker"
+  short_description: "Delegate bounded coding work to a persistent Claude Code session"
+  default_prompt: "Use $claude-code-worker to delegate this bounded task in an isolated worktree and report the result."

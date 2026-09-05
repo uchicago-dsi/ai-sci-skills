@@ -23,6 +23,7 @@ Each skill is intentionally compact. The shared versions encode decision rules a
 | `bounded-auto-loop` | Run a short autonomous loop with a fixed budget and stop rule |
 | `maintenance-pass` | Trim dead code, vestiges, and duplication without churn |
 | `research-code-parsimony` | Reuse existing owners and cut over cleanly instead of growing code |
+| `claude-code-worker` | Delegate isolated Claude Code tasks with resumable sessions and quota-aware recovery |
 | `pi-progress-synthesis` | Turn research results into evidence-backed scientific progress updates and decision-focused stories |
 
 ## Installation

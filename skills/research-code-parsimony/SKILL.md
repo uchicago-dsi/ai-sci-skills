@@ -22,6 +22,30 @@ Search before creating an owner. If none fits a genuinely new capability, create
 - Parsimony means less code to own — not fewest files, shortest diff, or clever one-liners. Readable, explicit code beats a compressed version.
 - Never satisfy the request by solving a smaller or easier scientific problem than the one asked for.
 
+## Express Cohesive Families As Directories
+
+Prefer a meaningful package hierarchy over a flat directory of long,
+repeated-prefix filenames. When several modules belong to one scientific or
+contract family, let the directory carry that context and give the modules
+short role names: for example,
+`training/concentration_field/diffusion/runtime.py` rather than
+`training/concentration_field_diffusion_runtime.py`. A separate
+`training/physics_field/direct_inverse/` can own its own data, objective, and QC
+modules; genuinely shared training infrastructure stays at the shared level.
+Group by cohesive ownership, not chronology, and add depth only when it makes
+navigation and responsibilities clearer. Do not create speculative package
+trees or duplicate a family merely to achieve symmetry.
+
+Apply this preference when choosing a new owner's home. Existing flat families
+can move in a bounded, authorized pass coordinated with their current owners;
+this preference does not authorize reorganizing active work during another
+task. Leave queued/running execution checkouts and immutable run artifacts
+untouched. Move live imports, entrypoints, config references, and hashed
+execution declarations together, updating valid source pins according to local
+policy. Validate the affected execution paths and remove old module routes
+without compatibility aliases. Completed runs retain their producing layout
+through their pinned commits, not duplicate source at HEAD.
+
 ## Cut Over Instead Of Layering
 
 When a change genuinely supersedes an existing implementation, retire it in the same scoped change:

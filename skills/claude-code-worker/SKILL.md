@@ -37,8 +37,11 @@ python "$CODEX_HOME/skills/claude-code-worker/scripts/run_claude_worker.py" star
   --state-dir "$STATE_DIR"
 ```
 
-The default is intentionally the strongest available Claude worker: Opus, high
-effort, autonomous tool use, unrestricted turn count, and write plus shell tools. Safety
+The default is Sonnet at medium effort for bounded coding and review, with
+autonomous tool use, unrestricted turn count, and write plus shell tools. Use
+compact, file-referenced briefs and send only unfinished scope. Do small edits
+locally when delegation and review would cost more than the task. Escalate model
+or effort only for an identified difficulty, not by default. Safety
 comes from Claude restricted/safe mode and the isolated worktree, not from making the
 worker read-only. The bridge does not use `--no-session-persistence`; it records the
 Claude session ID and raw JSON result under the state directory.
@@ -70,7 +73,12 @@ models or paid usage to evade a limit.
 - During cooldown, use native Codex subagents for bounded work when the user
   permits that fallback. They consume Codex quota; do not infer permission from
   a request to save Codex quota with Claude. Pass compact task context, not the
-  full conversation, and preserve the same scope and safety boundaries.
+  full conversation, and preserve the same scope and safety boundaries. For
+  bounded implementation and cross-file audits, use `gpt-5.6-terra` at
+  `medium` effort with `fork_turns="none"` rather than inheriting an expensive
+  manager model. Reserve smaller/lower-effort workers for mechanical tasks.
+  If an existing worker cannot change model in place, stop it, inspect its
+  partial work and transfer only unfinished work with a compact handoff.
 - Keep one owner per task. Before transferring unfinished Claude work to Codex,
   confirm the Claude invocation has ended, inspect its partial work, and record
   the transfer in existing task state. Give Codex only the remaining scope;
@@ -79,7 +87,7 @@ models or paid usage to evade a limit.
   check. `waiting` means the cooldown is active; `probe_due` means the time has
   elapsed, **not** that access is restored.
 - At `retry_at`, run the same command with `--probe`. This performs one tiny
-  tool-free, non-persistent request using the worker model (Opus by default).
+  tool-free, non-persistent request using the worker model (Sonnet by default).
   It does not execute the pending task. Before the deadline it makes no request.
   A recognized new limit refreshes the cooldown; other failures need diagnosis.
 - On `available`, prefer Claude again for new delegations and relevant paused

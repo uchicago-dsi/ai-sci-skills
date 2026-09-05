@@ -390,8 +390,8 @@ def build_parser() -> argparse.ArgumentParser:
     start.add_argument("--workdir", type=Path, required=True)
     start.add_argument("--prompt-file", type=Path, required=True)
     start.add_argument("--state-dir", type=Path, required=True)
-    start.add_argument("--model", default="opus")
-    start.add_argument("--effort", choices=("low", "medium", "high"), default="high")
+    start.add_argument("--model", default="sonnet")
+    start.add_argument("--effort", choices=("low", "medium", "high"), default="medium")
     start.add_argument("--max-budget-usd", type=float)
     start.add_argument("--claude-binary")
     followup = subparsers.add_parser("followup")
@@ -400,7 +400,7 @@ def build_parser() -> argparse.ArgumentParser:
     followup.add_argument("--claude-binary")
     availability = subparsers.add_parser("availability")
     availability.add_argument("--probe", action="store_true")
-    availability.add_argument("--model", default="opus")
+    availability.add_argument("--model", default="sonnet")
     availability.add_argument("--claude-binary")
     for command in (start, followup, availability):
         command.add_argument("--quota-file", type=Path,

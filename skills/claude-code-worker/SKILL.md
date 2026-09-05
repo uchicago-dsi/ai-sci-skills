@@ -67,6 +67,14 @@ models or paid usage to evade a limit.
 - Keep doing independent authorized work. Record the returned UTC `retry_at` in
   the existing task state and check it at natural work boundaries. Do not label
   the worker completed or abandon Claude for the rest of the goal.
+- During cooldown, use native Codex subagents for bounded work when the user
+  permits that fallback. They consume Codex quota; do not infer permission from
+  a request to save Codex quota with Claude. Pass compact task context, not the
+  full conversation, and preserve the same scope and safety boundaries.
+- Keep one owner per task. Before transferring unfinished Claude work to Codex,
+  confirm the Claude invocation has ended, inspect its partial work, and record
+  the transfer in existing task state. Give Codex only the remaining scope;
+  never run both workers on the same task or write set.
 - `python <skill-dir>/scripts/run_claude_worker.py availability` is a local-only
   check. `waiting` means the cooldown is active; `probe_due` means the time has
   elapsed, **not** that access is restored.
@@ -74,9 +82,12 @@ models or paid usage to evade a limit.
   tool-free, non-persistent request using the worker model (Opus by default).
   It does not execute the pending task. Before the deadline it makes no request.
   A recognized new limit refreshes the cooldown; other failures need diagnosis.
-- On `available`, inspect the worker's partial changes and current task relevance,
-  then resume its same session with `followup` for only the unfinished work. Do
-  not blindly repeat an action that may already have completed before the limit.
+- On `available`, prefer Claude again for new delegations and relevant paused
+  follow-ups. Let already-assigned Codex tasks finish; do not restart them in
+  Claude. For a task still owned by Claude, inspect its partial changes and
+  current relevance, then resume its same session with `followup` for only the
+  unfinished work. Reconcile any completed Codex work before a later Claude
+  follow-up; never replay a superseded or already-completed action.
 - A time-only reset with an explicit IANA timezone is interpreted as the next
   occurrence plus 60 seconds. Unknown reset formats use a 15-minute backoff.
   If quota is the only remaining wait, retain the task and use the product's

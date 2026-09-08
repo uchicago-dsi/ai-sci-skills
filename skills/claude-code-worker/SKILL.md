@@ -51,6 +51,21 @@ in the isolated worktree or protected state directory; AgentCom carries a short
 summary and exact artifact paths. Avoid periodic status chatter that creates
 model turns without changing a decision.
 
+For a synchronous one-shot task, prefer the bundled
+`scripts/run_agentcomm_worker.py`: it registers the supervisor with explicit
+`--as`, sends the task, generates the bootstrap, resolves the bridge relative
+to the installed skill, and fails before launch if delivery fails. The worker
+returns its compact result through the bridge as well as sending AgentCom
+acknowledgement/completion. Treat the bridge result as primary and do not poll
+or reread the supervisor mailbox unless the worker explicitly reports a
+question or the bridge fails. Do not use interactive `agentcomm bind` in an
+automated worker launch, and do not assume `$CODEX_HOME` is set.
+
+When the bridge runs longer than one tool yield, keep its `write_stdin` waits
+inside the same composed `functions.exec` call so waiting does not repeatedly
+wake the supervising model. See [references/communication.md](references/communication.md)
+for the compact orchestration pattern.
+
 AgentCom is coordination rather than authentication, persistence, or a
 security boundary. It does not replace the isolated worktree, the bridge's
 saved Claude session, quota handling, or parent verification. If AgentCom is
@@ -60,11 +75,14 @@ below rather than blocking the task.
 Run the bundled bridge from the repository that owns the worktree:
 
 ```bash
-python "$CODEX_HOME/skills/claude-code-worker/scripts/run_claude_worker.py" start \
+python "<skill-dir>/scripts/run_claude_worker.py" start \
   --workdir "$WORKTREE" \
   --prompt-file "$PROMPT_FILE" \
   --state-dir "$STATE_DIR"
 ```
+
+Resolve `<skill-dir>` from the loaded skill path rather than relying on
+`$CODEX_HOME`; the environment variable may be unset in fresh supervisors.
 
 The default is Sonnet at medium effort for bounded coding and review, with
 autonomous tool use, unrestricted turn count, and write plus shell tools. Use
@@ -78,7 +96,7 @@ Claude session ID and raw JSON result under the state directory.
 Send a follow-up turn to the same worker conversation:
 
 ```bash
-python "$CODEX_HOME/skills/claude-code-worker/scripts/run_claude_worker.py" followup \
+python "<skill-dir>/scripts/run_claude_worker.py" followup \
   --state-dir "$STATE_DIR" \
   --prompt-file "$FOLLOWUP_PROMPT_FILE"
 ```

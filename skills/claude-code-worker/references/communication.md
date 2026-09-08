@@ -21,3 +21,34 @@ put bulky evidence in the isolated worktree or state directory, referenced by ex
 AgentCom does not wake an ended model session by itself, preserve Claude conversation
 state, authenticate agent names, or make shared files safe; the bridge and worktree rules
 still own those responsibilities.
+
+## Efficient synchronous pattern
+
+For a one-shot task, call `scripts/run_agentcomm_worker.py` once and keep process
+waiting inside the same `functions.exec` orchestration. Substitute explicit,
+already-validated paths and names:
+
+```javascript
+let run = await tools.exec_command({
+  cmd: "python <skill-dir>/scripts/run_agentcomm_worker.py --repo <repo> --workdir <worktree> --task-file <task> --state-dir <state> --supervisor <supervisor> --worker <worker> --agentcomm <agentcomm>",
+  workdir: "<repo>",
+  yield_time_ms: 30000,
+  max_output_tokens: 4000,
+  login: false,
+});
+while (run.session_id) {
+  run = await tools.write_stdin({
+    session_id: run.session_id,
+    chars: "",
+    yield_time_ms: 300000,
+    max_output_tokens: 4000,
+  });
+}
+text(run.output);
+```
+
+Do not return the intermediate session ID to the model and then issue separate
+poll turns. Do not fetch acknowledgement or completion mail after a successful
+bridge return: those messages are durable coordination evidence, while the
+bridge response is the synchronous result. Read the mailbox only when a live
+question needs a decision or when diagnosing a failed bridge.

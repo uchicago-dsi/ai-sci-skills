@@ -37,6 +37,13 @@ Claude must acknowledge the assignment, report questions or blockers, and send
 a concise completion message through AgentCom. The supervisor reads its inbox
 at natural task boundaries and sends corrections through the same thread.
 
+Before launch, resolve AgentCom with `command -v agentcomm` and put that exact
+executable path and the required commands in the bootstrap prompt. Claude's
+restricted shell may not inherit the supervisor's `PATH`. Tell Claude not to
+search the filesystem for AgentCom; if the supplied executable fails, it must
+report that transport blocker in its bridge result instead of broadening the
+search.
+
 Do not duplicate the complete assignment in both a prompt file and AgentCom.
 Use the bridge prompt only to bootstrap the named Claude worker, direct it to
 read its mailbox, and state the safety boundary. Keep large reports and patches

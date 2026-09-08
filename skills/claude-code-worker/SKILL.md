@@ -28,6 +28,28 @@ native tool state. Give it a compact, self-contained prompt and verify its work 
 
 ## Start And Continue
 
+## Coordinate Through AgentCom
+
+When AgentCom is configured for the repository, use it as the default control
+channel between the supervising agent and Claude. Give each worker a unique,
+attributable AgentCom name and send the bounded assignment to that mailbox.
+Claude must acknowledge the assignment, report questions or blockers, and send
+a concise completion message through AgentCom. The supervisor reads its inbox
+at natural task boundaries and sends corrections through the same thread.
+
+Do not duplicate the complete assignment in both a prompt file and AgentCom.
+Use the bridge prompt only to bootstrap the named Claude worker, direct it to
+read its mailbox, and state the safety boundary. Keep large reports and patches
+in the isolated worktree or protected state directory; AgentCom carries a short
+summary and exact artifact paths. Avoid periodic status chatter that creates
+model turns without changing a decision.
+
+AgentCom is coordination rather than authentication, persistence, or a
+security boundary. It does not replace the isolated worktree, the bridge's
+saved Claude session, quota handling, or parent verification. If AgentCom is
+not installed or configured, use the prompt-file start/follow-up workflow
+below rather than blocking the task.
+
 Run the bundled bridge from the repository that owns the worktree:
 
 ```bash

@@ -13,3 +13,11 @@ inspect the returned JSON, and explicitly resume the saved Claude session for ea
 follow-up. Session persistence makes the worker conversational, but live unsolicited
 messages do not flow between Codex and Claude. The bridge therefore approximates native
 subagent steering as a sequence of `start` and `followup` calls.
+
+When AgentCom is available, it supplies the missing coordination channel without changing
+the model or quota owner. Use one named mailbox per Claude worker for the assignment,
+acknowledgement, questions, corrections, and completion notice. Keep messages concise and
+put bulky evidence in the isolated worktree or state directory, referenced by exact path.
+AgentCom does not wake an ended model session by itself, preserve Claude conversation
+state, authenticate agent names, or make shared files safe; the bridge and worktree rules
+still own those responsibilities.

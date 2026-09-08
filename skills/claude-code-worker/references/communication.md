@@ -40,9 +40,10 @@ while (run.session_id) {
   run = await tools.write_stdin({
     session_id: run.session_id,
     chars: "",
-    yield_time_ms: 300000,
+    yield_time_ms: 55000,
     max_output_tokens: 4000,
   });
+  if (run.session_id) notify("Claude worker is still running; Codex remains asleep.");
 }
 text(run.output);
 ```
@@ -52,3 +53,18 @@ poll turns. Do not fetch acknowledgement or completion mail after a successful
 bridge return: those messages are durable coordination evidence, while the
 bridge response is the synchronous result. Read the mailbox only when a live
 question needs a decision or when diagnosing a failed bridge.
+
+The short internal waits above are not separate model turns: `functions.exec` owns the loop.
+They allow a tool notification at least once per minute while preserving one supervisor wakeup.
+Do not run concurrent `write_stdin` calls against the same session.
+
+## Concurrent supervisor pattern
+
+When the supervisor must work on something else, launch the same helper with a short tool yield,
+retain its returned process/session handle, and continue. Poll it only at a natural boundary.
+This does not reduce worker capability, but each return to Codex consumes supervisor tokens and
+may reload substantial context. AgentCom completion is durable but does not itself wake Codex.
+
+Do not call this “free concurrency.” Use the quota-saver pattern for one bounded critical-path
+task and the concurrent pattern only when useful parallel reasoning outweighs the measured token
+cost.

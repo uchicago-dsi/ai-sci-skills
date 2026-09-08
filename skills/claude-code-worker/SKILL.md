@@ -9,12 +9,26 @@ Use Claude as a write-capable external worker while Codex remains the supervisin
 The worker is conversational across invocations, but it does not inherit the Codex thread or
 native tool state. Give it a compact, self-contained prompt and verify its work yourself.
 
+## Choose Claude Deliberately
+
+Prefer Claude when the task is bounded, isolatable, large enough to repay delegation overhead,
+and has objective acceptance checks. It is especially useful for multi-file implementation,
+mechanical migration, and repository audit work when Claude quota is cheaper than Codex quota.
+
+Work locally instead for a trivial edit, a task needing frequent interactive decisions, or work
+whose main difficulty is supervisor judgment. Do not delegate protected or credential-bearing
+content, authoritative imaging, source-data mutation, external publication, frozen execution
+state, or any task that cannot be isolated safely. If repeated parent correction dominates the
+work, stop delegating that task shape even when Claude quota is free.
+
 ## Before Launch
 
 1. Read the repository's applicable `AGENTS.md` and task instructions yourself.
 2. Choose one concrete, bounded task with an inspectable result.
 3. Create a dedicated clean Git worktree under the repository's configured worktree root.
    Do not point Claude at a shared checkout or an execution checkout bound to a live job.
+   Do not improvise a second worktree under `/tmp`; inspect a baseline with `git show` or a
+   worktree created under the configured root.
 4. Create the state directory outside the worktree. Use a protected directory when the
    prompt or result is private. Never put PHI, credentials, patient identifiers, source
    imaging, or protected clinical text in the prompt or worker-visible paths.
@@ -23,8 +37,14 @@ native tool state. Give it a compact, self-contained prompt and verify its work 
    - relevant user constraints and applicable repository rules;
    - current evidence and file paths needed for the task;
    - verification expected from the worker;
+   - exact writable paths, an exploration boundary, and a stopping condition;
    - whether it may commit (default: no);
    - an instruction to report changed files, checks, findings, and blockers.
+
+Bound diagnosis with a timeout, budget, or explicit retry limit when unchanged failures could
+produce an open-ended loop. A synchronous worker cannot receive a live answer while Codex is
+sleeping: if it needs a decision, it must send one AgentCom question, return `BLOCKED`, and let
+the supervisor resume the same session with a focused answer.
 
 ## Start And Continue
 
@@ -61,6 +81,17 @@ or reread the supervisor mailbox unless the worker explicitly reports a
 question or the bridge fails. Do not use interactive `agentcomm bind` in an
 automated worker launch, and do not assume `$CODEX_HOME` is set.
 
+Choose the supervision mode explicitly:
+
+- **Quota saver (default):** keep every process wait inside one composed `functions.exec`
+  call. Codex does not reason on other work during that call, but already-running agents,
+  Claude, Slurm jobs, and other processes continue. Use tool-level notifications for
+  heartbeats; they do not wake the model.
+- **Concurrent supervisor:** allow the command to return a live process/session handle, do
+  other work, and check it only at natural boundaries. This uses more Codex quota because
+  every supervisory turn reloads context. Use it when concurrent judgment is worth more than
+  minimum quota, not accidentally.
+
 When the bridge runs longer than one tool yield, keep its `write_stdin` waits
 inside the same composed `functions.exec` call so waiting does not repeatedly
 wake the supervising model. See [references/communication.md](references/communication.md)
@@ -88,21 +119,33 @@ The default is Sonnet at medium effort for bounded coding and review, with
 autonomous tool use, unrestricted turn count, and write plus shell tools. Use
 compact, file-referenced briefs and send only unfinished scope. Do small edits
 locally when delegation and review would cost more than the task. Escalate model
-or effort only for an identified difficulty, not by default. Safety
+or effort only for an identified difficulty, not by default. Prefer a stronger model only
+when it is likely to reduce iteration or correction enough to offset its Claude quota use. Safety
 comes from Claude restricted/safe mode and the isolated worktree, not from making the
 worker read-only. The bridge does not use `--no-session-persistence`; it records the
 Claude session ID and raw JSON result under the state directory.
+
+Use `--timeout-seconds` and `--max-budget-usd` on the AgentCom helper when appropriate. It
+writes `delegation_receipt.json` under the state directory with task class, model/effort,
+Claude turns/usage/duration, expected supervisor wakeups, and changed-file/LOC counts. Raw
+turns remain in the state directory; do not copy them into chat. After follow-ups, record the
+actual counts in the receipt so future routing decisions use completed-task evidence rather than
+only the initial turn; the follow-up command does this automatically.
 
 Send a follow-up turn to the same worker conversation:
 
 ```bash
 python "<skill-dir>/scripts/run_claude_worker.py" followup \
   --state-dir "$STATE_DIR" \
-  --prompt-file "$FOLLOWUP_PROMPT_FILE"
+  --prompt-file "$FOLLOWUP_PROMPT_FILE" \
+  --parent-correction
 ```
 
 Use follow-ups for correction, missing tests, or a focused question. Do not hand the
-worker a second unrelated task; start another isolated session instead.
+worker a second unrelated task; start another isolated session instead. Include
+`--parent-correction` only when the follow-up repairs or redirects worker output; omit it
+for an answer to the worker's blocker or a planned next validation. When a delegation
+receipt exists, the bridge updates its follow-up and correction counts automatically.
 
 ## Recover From Quota Limits
 
@@ -155,8 +198,12 @@ per session so a retry cannot overwrite the failed turn's evidence.
 ## Supervise And Integrate
 
 - Inspect the worktree diff, status, and commands/tests reported by Claude.
-- Run the relevant verification independently. Treat Claude's report as a claim, not
-  evidence.
+- Have the worker run Ruff/parse checks and a small number of targeted behavioral checks.
+  Codex independently owns final liveness/reference searches, semantic-diff review, provenance
+  pins, and the broad acceptance check. Treat Claude's report as a claim, not evidence.
+- When the repository embeds source/config digests, compute the old and new digest for every
+  changed tracked file, search for every old digest, repin only edges that were valid before,
+  and report edges that were already stale. The supervisor repeats this audit before integration.
 - Steer with another follow-up when the same bounded task needs correction.
 - Codex owns staging, integration, conflict handling, and user-facing conclusions unless
   the initial prompt explicitly assigned a worktree-local commit.

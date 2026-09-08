@@ -34,6 +34,13 @@ class QuotaCooldown(Exception):
         super().__init__("Claude quota cooldown")
 
 
+class WorkerTimeout(Exception):
+    def __init__(self, timeout_seconds: int, state_path: Path):
+        self.timeout_seconds = timeout_seconds
+        self.state_path = state_path
+        super().__init__(f"Claude worker exceeded {timeout_seconds} seconds")
+
+
 @contextmanager
 def _lock(path: Path):
     _private_directory(path.parent)
@@ -43,7 +50,9 @@ def _lock(path: Path):
         try:
             fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError as error:
-            raise RuntimeError("another worker/probe owns this state; do not duplicate it") from error
+            raise RuntimeError(
+                "another worker/probe owns this state; do not duplicate it"
+            ) from error
         yield
     finally:
         os.close(descriptor)
@@ -58,8 +67,10 @@ def _availability(path: Path, now: datetime | None = None) -> dict[str, Any]:
     if state["status"] == "rate_limited":
         now = now or datetime.now(timezone.utc)
         seconds = (datetime.fromisoformat(state["retry_at"]) - now).total_seconds()
-        state.update(status="waiting" if seconds > 0 else "probe_due",
-                     wait_seconds=max(0, int(seconds) + 1))
+        state.update(
+            status="waiting" if seconds > 0 else "probe_due",
+            wait_seconds=max(0, int(seconds) + 1),
+        )
     return {**state, "quota_path": str(path)}
 
 
@@ -74,8 +85,11 @@ def _limit_state(message: str, now: datetime) -> dict[str, Any]:
     # invented date. The CLI's observed time-only form includes an IANA zone.
     retry = now + timedelta(minutes=15)
     basis = "15_minute_backoff"
-    match = re.search(r"resets?\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)\s*\(([^)]+)\)",
-                      message, re.IGNORECASE)
+    match = re.search(
+        r"resets?\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)\s*\(([^)]+)\)",
+        message,
+        re.IGNORECASE,
+    )
     if match:
         hour, minute = int(match[1]), int(match[2] or 0)
         try:
@@ -91,27 +105,42 @@ def _limit_state(message: str, now: datetime) -> dict[str, Any]:
             basis = "provider_reset_plus_60_seconds"
         except (ValueError, ZoneInfoNotFoundError):
             pass
-    return {"status": "rate_limited", "observed_at": now.isoformat(),
-            "retry_at": retry.isoformat(), "retry_basis": basis}
+    return {
+        "status": "rate_limited",
+        "observed_at": now.isoformat(),
+        "retry_at": retry.isoformat(),
+        "retry_basis": basis,
+    }
 
 
-def _interpret(completed: subprocess.CompletedProcess, quota_path: Path) -> dict[str, Any]:
+def _interpret(
+    completed: subprocess.CompletedProcess, quota_path: Path
+) -> dict[str, Any]:
     try:
         result = json.loads(completed.stdout)
     except json.JSONDecodeError:
         result = None
-    failed = completed.returncode != 0 or isinstance(result, dict) and result.get("is_error")
-    message = str(result.get("result", "")) if isinstance(result, dict) else completed.stdout
+    failed = (
+        completed.returncode != 0 or isinstance(result, dict) and result.get("is_error")
+    )
+    message = (
+        str(result.get("result", "")) if isinstance(result, dict) else completed.stdout
+    )
     message += "\n" + (completed.stderr or "")
-    limited = re.search(r"(?:hit|reached|exceeded).*?(?:session|usage|rate).*?limit|"
-                        r"rate_limit_error|rate limit exceeded|usage limit reached",
-                        message, re.IGNORECASE)
+    limited = re.search(
+        r"(?:hit|reached|exceeded).*?(?:session|usage|rate).*?limit|"
+        r"rate_limit_error|rate limit exceeded|usage limit reached",
+        message,
+        re.IGNORECASE,
+    )
     if failed and limited:
         state = _limit_state(message, datetime.now(timezone.utc))
         _atomic_json(quota_path, state)
         raise QuotaCooldown({**state, "quota_path": str(quota_path)})
     if failed:
-        raise RuntimeError(f"Claude failed (exit {completed.returncode}); not a recognized quota limit")
+        raise RuntimeError(
+            f"Claude failed (exit {completed.returncode}); not a recognized quota limit"
+        )
     if not isinstance(result, dict):
         raise RuntimeError("Claude returned invalid JSON or a non-object result")
     return result
@@ -122,7 +151,10 @@ def _available(path: Path, started_at: datetime) -> dict[str, Any]:
     if previous["status"] in {"waiting", "probe_due"}:
         if datetime.fromisoformat(previous["observed_at"]) > started_at:
             return previous
-    state = {"status": "available", "checked_at": datetime.now(timezone.utc).isoformat()}
+    state = {
+        "status": "available",
+        "checked_at": datetime.now(timezone.utc).isoformat(),
+    }
     _atomic_json(path, state)
     return {**state, "quota_path": str(path)}
 
@@ -135,18 +167,39 @@ def _probe(args: argparse.Namespace) -> dict[str, Any]:
         started_at = datetime.now(timezone.utc)
         previous = _availability(args.quota_file)
         if previous["status"] == "available":
-            age = (started_at - datetime.fromisoformat(previous["checked_at"])).total_seconds()
+            age = (
+                started_at - datetime.fromisoformat(previous["checked_at"])
+            ).total_seconds()
             if age < 60:
                 return previous
         completed = subprocess.run(
-            [str(_claude_binary(args.claude_binary)), "--safe-mode", "--restricted",
-             "--strict-mcp-config", "--no-chrome", "--disable-slash-commands",
-             "--print", "--output-format", "json", "--tools", "",
-             "--no-session-persistence", "--model", args.model, "--effort", "low",
-             "--system-prompt", "Reply exactly AVAILABLE. Do not perform any task.",
-             "Reply exactly AVAILABLE."],
-            cwd=args.quota_file.parent, text=True, stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE, check=False, timeout=45,
+            [
+                str(_claude_binary(args.claude_binary)),
+                "--safe-mode",
+                "--restricted",
+                "--strict-mcp-config",
+                "--no-chrome",
+                "--disable-slash-commands",
+                "--print",
+                "--output-format",
+                "json",
+                "--tools",
+                "",
+                "--no-session-persistence",
+                "--model",
+                args.model,
+                "--effort",
+                "low",
+                "--system-prompt",
+                "Reply exactly AVAILABLE. Do not perform any task.",
+                "Reply exactly AVAILABLE.",
+            ],
+            cwd=args.quota_file.parent,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+            timeout=45,
         )
         result = _interpret(completed, args.quota_file)
         if str(result.get("result", "")).strip() != "AVAILABLE":
@@ -155,8 +208,11 @@ def _probe(args: argparse.Namespace) -> dict[str, Any]:
 
 
 def _next_turn(state_dir: Path, state: dict[str, Any]) -> int:
-    recorded = [int(p.stem.removeprefix("turn_")) for p in state_dir.glob("turn_*.json")
-                if p.stem.removeprefix("turn_").isdigit()]
+    recorded = [
+        int(p.stem.removeprefix("turn_"))
+        for p in state_dir.glob("turn_*.json")
+        if p.stem.removeprefix("turn_").isdigit()
+    ]
     return max([int(state["turn_count"]), *recorded]) + 1
 
 
@@ -193,6 +249,31 @@ def _atomic_text(path: Path, value: str) -> None:
     temporary.write_text(value, encoding="utf-8")
     os.chmod(temporary, 0o600)
     os.replace(temporary, path)
+
+
+def _update_delegation_receipt(
+    state_dir: Path, result: dict[str, Any], *, parent_correction: bool
+) -> None:
+    path = state_dir.resolve() / "delegation_receipt.json"
+    if not path.exists():
+        return
+    if path.is_symlink() or not path.is_file():
+        raise RuntimeError("delegation receipt must be a regular non-symlink file")
+    receipt = json.loads(path.read_text(encoding="utf-8"))
+    receipt["followup_count"] = int(receipt.get("followup_count", 0)) + 1
+    receipt["parent_correction_count"] = int(
+        receipt.get("parent_correction_count", 0)
+    ) + int(parent_correction)
+    receipt.setdefault("followups", []).append(
+        {
+            "turn": result.get("turn"),
+            "claude_turns": result.get("num_turns"),
+            "claude_cost_usd": result.get("total_cost_usd"),
+            "claude_usage": result.get("usage", {}),
+            "parent_correction": parent_correction,
+        }
+    )
+    _atomic_json(path, receipt)
 
 
 def _regular_prompt(path: Path) -> str:
@@ -261,6 +342,7 @@ def _invoke(
     session_id: str,
     resume: bool,
     max_budget_usd: float | None,
+    timeout_seconds: int | None,
     quota_path: Path,
 ) -> dict[str, Any]:
     command = [
@@ -296,16 +378,32 @@ def _invoke(
         command.extend(["--session-id", session_id])
     command.append(prompt)
     started_at = datetime.now(timezone.utc)
-    completed = subprocess.run(
-        command,
-        cwd=workdir,
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        check=False,
-    )
     raw_path = state_dir / f"turn_{turn:03d}.json"
     error_path = state_dir / f"turn_{turn:03d}.stderr"
+    try:
+        completed = subprocess.run(
+            command,
+            cwd=workdir,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+            timeout=timeout_seconds,
+        )
+    except subprocess.TimeoutExpired as error:
+        stdout = (
+            error.stdout.decode()
+            if isinstance(error.stdout, bytes)
+            else error.stdout or ""
+        )
+        stderr = (
+            error.stderr.decode()
+            if isinstance(error.stderr, bytes)
+            else error.stderr or ""
+        )
+        _atomic_text(raw_path, stdout)
+        _atomic_text(error_path, stderr)
+        raise WorkerTimeout(int(timeout_seconds or 0), raw_path) from error
     _atomic_text(raw_path, completed.stdout or "")
     _atomic_text(error_path, completed.stderr or "")
     result = _interpret(completed, quota_path)
@@ -333,6 +431,7 @@ def _start(args: argparse.Namespace) -> dict[str, Any]:
         "model": args.model,
         "effort": args.effort,
         "max_budget_usd": args.max_budget_usd,
+        "timeout_seconds": args.timeout_seconds,
         "turn_count": 1,
     }
     prompt = _regular_prompt(args.prompt_file)
@@ -349,6 +448,7 @@ def _start(args: argparse.Namespace) -> dict[str, Any]:
         session_id=session_id,
         resume=False,
         max_budget_usd=args.max_budget_usd,
+        timeout_seconds=args.timeout_seconds,
         quota_path=args.quota_file,
     )
     return {"state_path": str(state_path), "turn": 1, **result}
@@ -378,6 +478,7 @@ def _followup(args: argparse.Namespace) -> dict[str, Any]:
         session_id=str(state["session_id"]),
         resume=True,
         max_budget_usd=state.get("max_budget_usd"),
+        timeout_seconds=state.get("timeout_seconds"),
         quota_path=args.quota_file,
     )
     return {"state_path": str(state_path), "turn": turn, **result}
@@ -393,18 +494,23 @@ def build_parser() -> argparse.ArgumentParser:
     start.add_argument("--model", default="sonnet")
     start.add_argument("--effort", choices=("low", "medium", "high"), default="medium")
     start.add_argument("--max-budget-usd", type=float)
+    start.add_argument("--timeout-seconds", type=int)
     start.add_argument("--claude-binary")
     followup = subparsers.add_parser("followup")
     followup.add_argument("--state-dir", type=Path, required=True)
     followup.add_argument("--prompt-file", type=Path, required=True)
+    followup.add_argument("--parent-correction", action="store_true")
     followup.add_argument("--claude-binary")
     availability = subparsers.add_parser("availability")
     availability.add_argument("--probe", action="store_true")
     availability.add_argument("--model", default="sonnet")
     availability.add_argument("--claude-binary")
     for command in (start, followup, availability):
-        command.add_argument("--quota-file", type=Path,
-                             default=Path.home() / ".cache/claude-code-worker/quota.json")
+        command.add_argument(
+            "--quota-file",
+            type=Path,
+            default=Path.home() / ".cache/claude-code-worker/quota.json",
+        )
     return parser
 
 
@@ -413,6 +519,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     if getattr(args, "max_budget_usd", None) is not None and args.max_budget_usd <= 0:
         raise ValueError("--max-budget-usd must be positive")
+    if getattr(args, "timeout_seconds", None) is not None and args.timeout_seconds <= 0:
+        raise ValueError("--timeout-seconds must be positive")
     args.quota_file = args.quota_file.expanduser().absolute()
     try:
         if args.action == "availability":
@@ -420,9 +528,28 @@ def main(argv: Sequence[str] | None = None) -> int:
         else:
             with _lock(args.state_dir / ".worker.lock"):
                 result = _start(args) if args.action == "start" else _followup(args)
+                if args.action == "followup":
+                    _update_delegation_receipt(
+                        args.state_dir,
+                        result,
+                        parent_correction=args.parent_correction,
+                    )
     except QuotaCooldown as error:
         print(json.dumps(error.state, indent=2, sort_keys=True))
         return 75
+    except WorkerTimeout as error:
+        print(
+            json.dumps(
+                {
+                    "status": "timeout",
+                    "timeout_seconds": error.timeout_seconds,
+                    "raw_result_path": str(error.state_path),
+                },
+                indent=2,
+                sort_keys=True,
+            )
+        )
+        return 124
     compact = {
         key: result.get(key)
         for key in (

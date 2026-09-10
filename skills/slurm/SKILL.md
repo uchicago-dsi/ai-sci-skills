@@ -96,6 +96,20 @@ description: "Inspect queue state, submit or cancel jobs, debug sbatch and submi
 - Before sending a requested accelerator to overflow, inspect live
   partition/QoS associations and node GRES. Prefer a compatible
   priority/non-preemptible route when the project is entitled to it.
+- **Entitlement is a policy fact, not a scheduler fact. Never infer it from
+  what the scheduler will accept.** `AllowQos=ALL`, a QoS present in your
+  association, an accepted `scontrol update`, and even a returned StartTime
+  estimate all mean only that the config did not stop you. Clusters routinely
+  ship permissive configs over queues that are borrowed, lab-owned, or
+  otherwise not yours to prioritize on, and the scheduler will happily model a
+  request it should have rejected.
+- Where a partition is borrowed or owned by another group, the partition
+  determines the service class. Do not move a job to a higher-priority QoS on
+  such a partition to escape preemption, however well it would work. Read the
+  site note; if the site note does not say, ask the user. Record the answer as
+  policy so the next agent does not re-derive it from `scontrol`.
+- Preemption on borrowed capacity is the arrangement functioning, not a fault
+  to engineer around. Make startup cheap and checkpoint early instead.
 - Do not infer that direct priority capacity is unavailable merely because a
   shared persistent-allocation broker has no active holder or slots. Check the
   direct scheduler route independently; brokers and direct Slurm access are
@@ -106,7 +120,7 @@ description: "Inspect queue state, submit or cancel jobs, debug sbatch and submi
   - the run is a short one-off, probe, smoke test, or debug job,
   - the work is eviction-tolerant and easy to requeue or replace.
 - Avoid preemptible capacity for long, fragile, or high-value runs unless the user explicitly wants that tradeoff.
-- Distinguish scheduler max from repo policy. A repo may intentionally cap itself below the cluster maximum.
+- Distinguish scheduler max from repo policy, and both from site policy. A repo may intentionally cap itself below the cluster maximum, and a site may intend limits its config does not actually enforce.
 - When choosing a preemptible tier, state why the run belongs there, for example "standard queue is full" or "short debug probe".
 
 ## Debug Failures In Order

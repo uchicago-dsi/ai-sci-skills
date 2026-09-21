@@ -202,11 +202,14 @@ report every number it wrote as verified. The audit would confirm only that
 the agent can copy. An auditor earns its verdict by checking work it did not
 do.
 
-So give a number three states and let two different agents move it between
-them: unknown, provisional with its source, and final. The filler may move a
-number from the first state to the second and never to the third; the auditor
-has no write tools at all. Everything the filler writes stays visibly
-provisional, so nothing it guessed can quietly become a result.
+The separation that matters is writing versus checking, and only that. Do not
+also forbid the filler from writing a number that happens to be final:
+finality is not a property of the number or of who typed it, but of its
+source — a value is final when the run it came from is the run being
+published. Ask that of the whole ledger once the last run lands, rather than
+tracking it per number while drafting. What the filler owes you is an
+accurate record of which run each value came from; what the auditor owes you
+is a check it could not have rigged.
 
 ## Three moments to use this skill
 

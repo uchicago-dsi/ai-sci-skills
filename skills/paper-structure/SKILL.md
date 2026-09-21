@@ -165,7 +165,28 @@ not to flag those.
 
 Keep the claim map. It answers two later questions cheaply: whether the
 abstract claims anything the paper does not show, and whether every result
-gets interpreted somewhere.
+gets interpreted somewhere. The `claim-evidence-auditor` reads it rather than
+rebuilding it.
+
+## Checking that the evidence is there
+
+Separately from redundancy, every claim and every reported number should be
+traceable to the artifact or citation behind it. Record the link inline, where
+the number is written, rather than in a table that drifts out of step with the
+prose; in a LaTeX manuscript an `\ev{value}{source}` macro that typesets as
+the value alone costs the reader nothing and makes the ledger greppable.
+
+Then run the `claim-evidence-auditor`, which returns a verdict per item:
+traced, drifted, cited, miscited, unsupported or stale. The verdict worth
+building for is **drifted** — the source exists and the manuscript's value no
+longer matches it. Transcription error between a notebook and a manuscript is
+invisible on rereading, survives every round of prose editing, and is what
+gets corrected after publication. Check the digits, the units and the
+denominator separately, since a number can be right and its `n` wrong.
+
+This pass does not judge whether the evidence is *sufficient* for the claim.
+That is overclaiming, and `skeptical-labmate` owns it. Keeping them apart is
+what stops the evidence check from becoming a general review nobody runs.
 
 ## Three moments to use this skill
 

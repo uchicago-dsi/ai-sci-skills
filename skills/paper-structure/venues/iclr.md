@@ -4,7 +4,7 @@
 (<https://iclr.cc/Conferences/2026/AuthorGuide>) and the ICLR LLM policy page
 (<https://iclr.cc/FAQ/LLM>). **Re-verify every cycle** — ICLR changes page
 limits and required statements between years more often than a journal does.
-**Register:** `ml-conference` *(not yet written; see the note at the end)*
+**Register:** `ml-conference`
 
 Open-review machine learning conference. Reviewers are researchers reading
 under time pressure with several papers each, and every review is public
@@ -95,10 +95,3 @@ paper deadline and is binding.
 - Load-bearing material hidden in the appendix, which reviewers are entitled
   to ignore.
 - An unaddressed limitation that a reviewer finds themselves.
-
-## Note
-
-This file's register, `ml-conference`, is not written yet. Until it is, edit
-ICLR prose with `journal-imrad` and override two things by hand: ICLR expects
-the **active voice and the first person** ("we show"), and it tolerates a more
-informal, direct register than a clinical journal.

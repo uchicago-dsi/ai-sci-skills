@@ -76,6 +76,28 @@ work without asking you a question. This is the one section where naming the
 method precisely is the job rather than a lapse, and where stating a routine
 check is required rather than self-congratulation.
 
+**Where the cohort goes** depends on the venue's genre, and getting this
+wrong is a common import from the wrong tradition. In a clinical or
+epidemiological journal, Methods gives eligibility and recruitment and Results
+opens with a patient-characteristics table, because who was studied is a
+finding. In a methods or physics journal the cohort is apparatus: it belongs
+in Methods entirely, and Results is about the measurement. Check what the
+venue's own recent papers do before moving anything.
+
+The exception worth looking for: if a cohort property is an **independent
+variable** in the analysis rather than only a description — a scanner field
+strength, a sampling rate, an acquisition parameter you stratify by — then its
+distribution has a claim on Results even at a methods venue, because the
+reader needs it to judge the stratification.
+
+**A Methods paragraph that reasons is a Discussion paragraph in the wrong
+place.** This is the most frequent structural defect in a Methods section, and
+it hides well because each sentence is true. The tell is a "so", "therefore"
+or "which means" joining a fact about the setup to a consequence for the
+results. State the fact in Methods; put the consequence in the Discussion,
+where it probably already is — check, because the duplicate is usually
+verbatim.
+
 **Results.** What was measured, in the units it was measured in, with its
 denominator and its `n`. States; does not interpret. The commonest structural
 defect in a draft is a Results paragraph that has started explaining why the
@@ -118,6 +140,33 @@ is placed as one.
 - If the negative result is the paper's main contribution, the spine sentence
   should say so, and the Introduction should promise it.
 
+## Checking for redundancy
+
+A manuscript repeats itself in ways its author cannot see, because the person
+who just wrote a paragraph is the worst-placed reader to notice it restates
+something three thousand words earlier. Use the `redundancy-auditor` subagent,
+which reads the document fresh and returns a claim map: every claim, where it
+appears, and whether each appearance states, previews, restates, interprets or
+bounds it. Redundancy shows up as a claim appearing in a role it should not.
+
+Run it at two moments and not continuously. A draft in progress repeats itself
+for good reasons, and re-auditing after every edit spends a full read to learn
+nothing changed.
+
+- **When a section is finished**, scoped to that section.
+- **When the whole draft is finished**, across sections, before any prose
+  editing. Cutting a duplicated paragraph is worth more than polishing both
+  copies of it.
+
+Tell the auditor the venue, since venues differ on how much restatement they
+expect. Some restatement is required — the abstract restates the paper, the
+Discussion may open by stating what was established — and the auditor is told
+not to flag those.
+
+Keep the claim map. It answers two later questions cheaply: whether the
+abstract claims anything the paper does not show, and whether every result
+gets interpreted somewhere.
+
 ## Three moments to use this skill
 
 **Before drafting.** Load the venue, write the spine, lay out the skeleton as
@@ -131,8 +180,10 @@ sections.
 
 **At revision.** Audit against structure rather than prose: does each section
 still do only its job, does every figure answer a named question, does the
-count fit, does the abstract match what the paper ended up showing. Then hand
-the prose to `humanize` with the venue's register.
+count fit, does the abstract match what the paper ended up showing. Run the
+`redundancy-auditor` across the whole draft. Then hand the prose to `humanize`
+with the venue's register — in that order, because cutting a duplicated
+paragraph is cheaper than editing it twice.
 
 ## Adding a venue
 

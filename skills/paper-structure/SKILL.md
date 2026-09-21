@@ -188,6 +188,26 @@ This pass does not judge whether the evidence is *sufficient* for the claim.
 That is overclaiming, and `skeptical-labmate` owns it. Keeping them apart is
 what stops the evidence check from becoming a general review nobody runs.
 
+### Filling numbers is a different job from checking them
+
+A draft accumulates placeholders faster than anyone fills them, and the
+numbers usually exist already in a notebook or a run output. That work is
+mechanical and worth delegating, to `draft-number-filler` — but to a
+different agent than the one that audits, and with write access the auditor
+does not have.
+
+The reason is not tidiness. An agent that writes a number into the manuscript
+from the notebook and then audits the manuscript against the notebook will
+report every number it wrote as verified. The audit would confirm only that
+the agent can copy. An auditor earns its verdict by checking work it did not
+do.
+
+So give a number three states and let two different agents move it between
+them: unknown, provisional with its source, and final. The filler may move a
+number from the first state to the second and never to the third; the auditor
+has no write tools at all. Everything the filler writes stays visibly
+provisional, so nothing it guessed can quietly become a result.
+
 ## Three moments to use this skill
 
 **Before drafting.** Load the venue, write the spine, lay out the skeleton as

@@ -138,6 +138,108 @@ description: "Inspect queue state, submit or cancel jobs, debug sbatch and submi
 - Use absolute paths for scripts, configs, run roots, and log directories in handoff notes.
 - Name uncertainty explicitly and state the fastest next discriminative check.
 
+
+## Validate A Wrapper Before It Owns A Cohort
+
+- New submit wrappers must exercise real argument parsing for one valid action and
+  for missing arguments. A syntax check such as `bash -n` cannot detect malformed
+  parameter expansion. Prefer explicit argument-count validation over complex usage
+  text inside shell parameter expansion.
+- Before expanding an array, exercise the scheduler-to-owner mapping with two
+  distinct array indices, or an equivalent real parsing check. The owner must fail
+  when an explicit task index conflicts with `SLURM_ARRAY_TASK_ID`; one scheduler
+  task may never silently own another task's output.
+- Pass run variables with `--export=ALL,VAR=value,...` or a true inline assignment
+  (`VAR=value sbatch ...`). Unexported shell variables do not reach Slurm and can
+  silently trigger wrapper defaults. Do not put a value containing a comma in
+  Slurm's comma-delimited `--export` list; use an export file or an already-exported
+  environment value, and have the wrapper log and verify the resolved full value
+  before launching expensive work.
+- Array stdout/stderr paths must contain `%A_%a`. A shared `%j` log can truncate or
+  interleave task evidence.
+- Do not inherit a runtime default — device, worker count, partition, shard count —
+  from an existing wrapper without checking what it costs. An inherited value
+  carries no evidence that anyone measured it, and a wrong one can multiply a job's
+  cost by an order of magnitude while still looking like a working command.
+
+## Run A Real Preflight Before `sbatch`
+
+A real immutable preflight must pass before submission; submission success is never
+a substitute for preflight validation.
+
+That preflight must execute **every artifact the job writes** before its first
+scientific kernel, the run README included, on the submitting host. A preflight that
+validates inputs and stops short of writing the outputs passes a run that cannot
+start: a stale provenance key in a README writer aborted an entire array having
+touched no science, twice in one day, and each loss was seconds of headnode work
+away from being caught.
+
+Size monolithic cohort walltime from measured representative throughput plus
+reducer and finalization headroom, and exercise the actual finalize path against
+disposable prepare-stage provenance before expensive submission.
+
+Before requesting memory near a node's advertised total, inspect live memory and run
+`sbatch --test-only`. Slurm's `G` unit may not match a displayed decimal MB, so
+leave schedulability margin.
+
+## Persist Progress As You Go
+
+Any job that runs long enough to be killed must persist progress as it goes. A run
+that accumulates results in memory and writes once at the end loses everything to a
+walltime limit, a node failure, or a preemption — and loses the most when it was
+nearly done.
+
+Write each unit as it completes and skip finished units on restart, so an
+interrupted run is topped up rather than repeated. This holds on every lane; the
+checkpoint/resume contract required for opportunistic capacity is a stricter case of
+it, not the only place it applies.
+
+## Fan Out And Reduce
+
+- Default splittable compute, including multi-case renderers and galleries, to
+  independent sharded arrays. Project wall time from the first representative real
+  unit, merge explicitly, and resubmit only the failed or preempted shards.
+- Array reducers should depend on shards with `afterany`, then enforce semantic
+  success: require every expected manifest or summary, record skips and failures,
+  fail on missing required artifacts, and expose `afterok` only downstream.
+- Long shards resume only from validated case-complete artifacts, release case-local
+  memory, and account for every input exactly once — as processed, as scientifically
+  excluded with a typed reason, or as failed.
+- For restartable work on opportunistic capacity, submit **once** using the site
+  profile's comma-separated opportunistic partitions, QoS, and typed GRES, and let
+  the scheduler choose. Do not hard-code one partition or duplicate submissions to
+  chase capacity; split submissions only for a genuine hardware, policy, dependency,
+  or resource difference.
+
+## Treat Backlog As Normal
+
+Useful jobs may sit pending when queue policy says to overfill. Treat
+`PD(QOSMaxJobsPerUserLimit)`, `PD(Resources)`, and similar backlog as normal
+queueing unless the logs or your instructions say otherwise.
+
+
+## Measure Memory Before Releasing Concurrency
+
+Before releasing concurrent volume or large-object preprocessing, measure a
+representative large case's peak RSS at the intended worker count and leave node
+headroom. Keep the worker count as runtime plumbing, so an idempotent shard can
+resume at lower concurrency after an OOM without changing the scientific contract.
+
+## Lock A Shared External Resource For The Whole Run
+
+A long-running driver that owns a shared external resource — a delivery share, a
+mounted staging root — must hold an exclusive lock for its whole run, and must stop
+rather than wait when the resource changes underneath it.
+
+A mutation lock inside the worker protects only that mutation: two drivers can still
+each believe they own the resource, and the one whose expected arrival count another
+driver already drained will wait out its timeout and then act on a later batch under
+the earlier batch's provenance.
+
+Prefer a lock whose failure mode cannot be a false conflict. A pid or command-line
+scan matches any shell whose own arguments mention the driver, and will block healthy
+runs.
+
 ## References
 
 - Read `references/bootstrap.md` when you need to bootstrap `docs/slurm-site.md` for a new cluster or repo.

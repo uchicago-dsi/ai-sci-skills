@@ -177,3 +177,37 @@ verified.
   conclusion.
 - Use `$handoff` to preserve restartable global state.
 - Use `$bounded-auto-loop` when supervision has a time or iteration budget.
+
+
+## Treat A Persistent Goal As An Outcome Contract
+
+A persistent goal is a durable outcome contract, not a task list. Before creating one
+from an autonomy request, show the user the exact outcome, the boundaries, the
+definition of done, and the stop or escalation conditions, for approval; keep
+intermediate checks in the plan.
+
+If steering materially changes the desired outcome or the boundaries, pause and
+propose a goal edit before continuing. Do not substitute an open-ended catch-all such
+as "continue through next steps" for explicit scope.
+
+## Own The Steering Loop
+
+The supervising agent owns the steering loop. Resume an unintentionally paused goal
+when unfinished in-scope work remains, and verify delivery rather than waiting for the
+user.
+
+At each decision point the worker should leave a compact state / evidence / decision /
+next-action report in its visible pane and continue, unless an escalation condition
+fired. Independent agents use the private mailbox; the supervisor still verifies job
+evidence at the natural cadence. Managed subagents may message their parent directly.
+
+## Exhaust The Live Channels Before Declaring An Agent Unreachable
+
+Before declaring an agent unreachable or asking the user to relay a message,
+enumerate native subagents, tmux or screen sessions, and configured task interfaces,
+verify the target, and use the least invasive live channel.
+
+Start a persistent tmux owner from the repository after sourcing its connectivity
+environment. On a cold restart, reload the applicable rules files, inspect version
+control and goal state, list and capture live panes, then read the routed notebook and
+the current run README before steering.

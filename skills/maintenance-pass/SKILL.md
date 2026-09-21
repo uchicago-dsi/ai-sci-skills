@@ -185,3 +185,45 @@ Lead with the maintenance result:
 - Validation run and any failures or skipped checks.
 - Residual risk and the next 1-3 highest-yield maintenance candidates.
 - The single best next-pass recommendation, including target area, evidence or expected yield, risk, and validation scope. Always include this after a maintenance pass, even when not asked explicitly.
+
+
+## Keep Maintenance In Its Own Lane
+
+A cleanup backlog does not authorize or require maintenance during scientific,
+implementation, experiment, or mission-control work. A research manager must not
+start, supervise, review, integrate, or routinely report maintenance agents while an
+active scientific outcome remains.
+
+Maintenance runs only in an explicitly dedicated maintenance session or manager that
+the user starts or authorizes. That owner manages its workers, commits, notebook
+ledger, and reporting end to end, without consuming the research manager's attention
+or agent slots. If concurrent maintenance creates a material collision with an active
+scientific owner, a frozen-artifact risk, or a user-only authority question, report
+only that exception and otherwise keep the lanes isolated.
+
+Deleting what your own change supersedes is not maintenance and is not restricted by
+this rule; see `research-code-parsimony`.
+
+## Maintain The Rules File, Do Not Accumulate It
+
+A project rules file grows from incidents and shrinks with the code it guards.
+
+- After any material mistake, near-miss, wasted compute, confusing workflow, or user
+  correction, identify the general rule that would have prevented it and propose a
+  concise change in the next substantive update. If an existing rule already covers
+  the incident, explain why it was missed and propose clearer wording, placement, or
+  triggers instead of a duplicate. Prefer reusable principles to incident-specific
+  prohibitions.
+- File a new rule in the topical section that owns its subject. Reserve a "critical
+  invariants" section for rules whose violation destroys data, exposes protected
+  information, or invalidates a result in a way that rerunning cannot repair; that
+  section stays useful only while it stays short.
+- **Retire a rule together with the code it guards.** When a change removes the last
+  consumer of the mechanism, script, dataset, contract, or failure mode a rule exists
+  to prevent, delete that rule in the same commit and say so in the commit message.
+- Outside that same-commit case, do not open a rule-pruning pass on your own
+  initiative or on any per-task or per-session schedule. Propose retirements only
+  during a maintenance pass that already removed a whole mechanism family, or when
+  the user asks. A rule whose mechanism still exists stays. Rare triggering is not
+  evidence that a rule is dead: these rules are scar tissue from real incidents, and
+  a redundant rule costs far less than a missing one.

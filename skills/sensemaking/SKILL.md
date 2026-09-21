@@ -72,6 +72,50 @@ When using this skill, structure the reasoning as:
 - If the finding is believable but not consequential, state that no plan change is warranted.
 - If the finding is not yet believable, state the next falsifier or sanity check.
 
+
+## Verify The Element Set Before Comparing Numbers
+
+Verify a matched element set through a quantity that depends **only on the target**,
+computed over the whole set by each side independently: the target's mean square, or
+a rank-k approximation of it.
+
+Item count, support, and scoring surface can all agree while the roster silently
+differs, and every model-dependent number stays plausible when it does. A
+target-only quantity cannot differ between two owners scoring the same elements, so
+it fails loudly and immediately when they are not. Two owners once disagreed on a
+reference by 0.024 with matched counts and matched surfaces, because their
+selections overlapped on 12 of 48 rows; the rank-1 residual is what exposed it, and
+on the shared 12 they agreed to 5e-16.
+
+Join on physical identity rather than on a positional index. An index is renumbered
+per artifact, and a wrong join returns a plausible number rather than an error.
+
+## Compare Matched Units, Not Aggregates
+
+Per-unit losses and errors are usually heavy-tailed, so a mean over a window is
+dominated by whichever few hard units it happens to contain. Pair by unit, report
+medians and a paired ratio, and treat a difference that survives neither as absent.
+
+## Read The Units Before Converting
+
+- Check whether a field is a unit fraction or already in percentage points before
+  converting — a `_frac` and a `_pct` suffix mean different things, and only the
+  metric's owner settles it. For decision-relevant values, report both the raw
+  fraction and the percentage explicitly.
+- When merging CSV-backed metrics, select numeric cells value by value rather than
+  inferring a whole column from one row. Missing string identifiers deserialize as
+  `NaN` and must never enter a numeric aggregation.
+
+## Make QC Galleries Show The Edges
+
+- A distribution or gate QC gallery must deterministically include the best example,
+  the nearest below threshold, the nearest above threshold, and the worst, within
+  each major stratum. The first few examples in lexicographic order are not enough.
+- A renderer working in a native coordinate system must not assume a fixed array
+  axis is the one to slice along. Choose a readable plane from the actual geometry,
+  and verify explicitly that anisotropic inputs do not collapse into unreadable
+  narrow panels.
+
 ## References
 
 - Read `references/checks.md` for reusable prompts and compact response templates.

@@ -57,6 +57,40 @@ When using this skill, report:
 - If the claim is too strong, rewrite it in the weaker form you would trust.
 - If the plan is weak, state the one check or comparison that should happen before spending more compute.
 
+
+## Ask Whether It Is A New Mechanism Or A Cleaner Replication
+
+Before presenting a retrain as a new mechanism, compare its data, target, objective,
+model, split, and endpoint with the nearest completed attempt. If only the split or
+the provenance changed, call it a cleaner replication or a diagnostic, not a remedy
+for the prior scientific failure.
+
+## Do Not Claim A Global Result From A Local Search
+
+Before claiming a global peak or extremum for a multimodal curve or objective,
+enumerate the relevant modes over the declared domain and refine each candidate. One
+initializer, grid neighborhood, or local optimum is not global evidence.
+
+## Diagnose Censoring Before Widening A Prior
+
+Do not calibrate a bounded prior by inflating its covariance when missed references
+are parked at a parameter bound. Diagnose the censoring and separate genuine latent
+variation from measurement uncertainty before widening the prior or relaxing
+coverage.
+
+## Watch For A Stand-In That Cannot Answer The Question
+
+A diagnostic that substitutes a different model family for the one under test must
+name which structural properties of the substitute could by themselves produce the
+observed result, and it may not carry a negative conclusion about the real model
+when the substitute lacks a degree of freedom the real model has. A family that
+cannot express the observed shape will always pay a large residual and will always
+buy amplitude with an implausible scale, so both outcomes are properties of the
+stand-in rather than findings. Cheapness justifies a stand-in for a mechanics probe,
+never for a claim about the real model's capability. Labelling the substitution is
+necessary and not sufficient — the label has to constrain which conclusions are
+allowed.
+
 ## References
 
 - Read `references/prompts.md` for compact review prompts and response shapes.

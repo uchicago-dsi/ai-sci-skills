@@ -80,3 +80,130 @@ Match the check to the claim: imports and compilation check mechanics, not numer
 Report what you added, what you reused, what you retired and on what evidence, and which check you ran, proportional to the change.
 
 Inspired by [Ponytail](https://github.com/DietrichGebert/ponytail)'s reuse-first approach to avoiding unnecessary code.
+
+
+## Fail Fast, And Keep One Current Interface
+
+- No silent fallbacks, no hidden defaults outside the config package, no
+  compatibility shims, deprecated aliases, fallback CLI names, or duplicate
+  control paths unless the user explicitly asks for a transition period. Keep one
+  current interface and update the callers.
+- Reproducibility comes from version control and pinned commits, never from
+  backward-compatible code. A run reproduces because its commit, config, and input
+  digests are recorded, so it runs against its own pinned commit where every field,
+  key, schema, and signature still agree. Nothing in the current tree needs to keep
+  working for older inputs, and a completed run needing its producing commit to
+  replay is an acceptable cost, not an objection.
+- So parsimony beats backward compatibility. Delete anything whose only remaining
+  purpose is keeping an older input, artifact, or caller working, and delete it
+  together with whatever declares it so the two cannot disagree. When a problem
+  surfaces, clean aggressively rather than working around it: remove circular
+  imports, generation chains, shims, and duplicated near-copies outright, and accept
+  some short-term instability. A bug is cheaper to find and fix than a large body of
+  tangled code is to carry.
+- The one thing that earns its place is a field or branch a live owner actually
+  reads. Establish that with a search rather than assuming, and say which readers
+  you found.
+
+## Delete What Your Own Change Supersedes
+
+Deleting what your change supersedes is part of that change, not maintenance. When
+a step replaces a mechanism, estimator, renderer, config, or owner, remove the
+superseded implementation, its configs, and the helpers it alone used **in the same
+commit**, reroute every live caller, and confirm no live reference survives.
+
+History and the completed run's recorded commit preserve the exact producing
+source, so a superseded path need not stay executable — and a still-runnable
+invalid path is worse than an absent one, because a later reader cannot tell which
+is current. This does not require a maintenance session and the maintenance-lane
+rules do not restrict it.
+
+## Prefer One Owner To Several Copies
+
+- Before adding helpers, loaders, writers, metrics, plots, path builders, cache
+  policies, CLIs, or training support, search for and extend the canonical owner,
+  replace matching duplicates when safe, and keep model-specific code thin unless
+  its contract genuinely differs.
+- **Before changing a contract, find every place that enforces it.** A guard,
+  horizon, schema, or output shape expressed in two places will disagree the moment
+  one is edited, and the copy you did not change fails at the next run rather than
+  at the edit. Prefer extracting one owner over updating several, and confirm no
+  private copy survives. Search for the *decision*, not the symbol: a copy that
+  reimplements the contract in another language shares no identifier with the
+  original, so grepping the constant's name finds the Python enforcers and misses
+  the `find` in a shell wrapper encoding the same rule. Expect the stale copy to be
+  the one whose output nobody validates, because nothing fails when a README lies.
+- Before adding a pipeline-stage owner likely to exceed ~300 lines, name the nearest
+  existing owner and quantify their contract overlap. Extract substantial shared
+  loading, feature, provenance, or reduction logic into one package owner before
+  committing.
+- Before importing or reusing a private helper from another script, inspect its
+  exact signature and one current caller, then exercise its transitive
+  serialized-input field contract on one real current row. A matching name is not an
+  interface contract.
+
+## Name By Role, Not By Chronology
+
+- Name scripts, modules, entrypoints, and config files by their scientific or
+  contract role. Do not use trailing implementation tags such as `_v1`, `_v2`, or
+  `_v3` in live code filenames; history tracks source versions, and a successor
+  must either keep the one canonical filename or take a human-meaningful name for a
+  genuinely different mechanism. Update all callers and delete the superseded
+  implementation rather than keeping both names. Explicit versions remain
+  appropriate inside immutable serialized schema identifiers, artifact/run slugs,
+  and provenance records where they distinguish incompatible stored contracts — but
+  not in executable owner filenames.
+- Use compact, descriptive, human-readable `snake_case` semantic slugs naming the
+  artifact, the dataset or mechanism, and the main differing knob. Apply this to
+  run and output directories and to run-name fields; keep details in config, queue
+  items, or provenance. Avoid opaque-only IDs, double underscores, repeated parent
+  context, and external-tool style unless required.
+- Keep dates and timestamps in the README, notebook, provenance, or title text, not
+  in repository-owned paths or slugs unless a tool requires them. Resolve collisions
+  by updating, archiving, superseding, or adding a meaningful suffix that says what
+  differs.
+- Do not create parallel directories, duplicate notes or runbooks, repeated path
+  segments, or convenience naming schemes. If the organization is wrong, do a
+  bounded reorg: choose one owner, remove or reroute safe duplicates, update
+  references, and record the ownership rule.
+- Framework-imposed paths are exceptions, not style examples. Do not rename them in
+  place, but report them through concise aliases where possible.
+- Keep canonical paths copy-pasteable on one line without ellipses; define a concise
+  variable such as `RUN=...` for nested artifacts.
+
+## Retire Code Safely
+
+- Before deleting a script or shared module, search its importers, wrappers,
+  configs, and active docs; remove or reroute dependents in the same change, then
+  import-check the surviving entrypoints.
+- **Liveness is not a property of the tracked tree.** `git grep` omits untracked
+  files unless told otherwise, so a module whose only callers are uncommitted work
+  in progress scans as unreferenced. Three separate retirements in one session
+  deleted live modules for exactly this reason, and the affected work had no run
+  evidence either, because its run had not happened yet.
+- A module named only in a hashed execution-surface declaration such as
+  `EXECUTION_FILES` has zero importers and is still load-bearing: deleting it raises
+  at run start, which no import check can see. Validate a retirement by running the
+  execution-path check, not only by importing what survived.
+
+## Do Not Edit A File A Process Is Executing
+
+A shell reads its script incrementally and a long-running interpreter may reread or
+lazily import, so shifting byte offsets under a live process can make it resume
+mid-statement on text that was never a command. Check for a running instance first.
+When one exists, either wait, or write the replacement to a new path and `mv` it
+over the target so the running process keeps its original inode. An in-place edit
+mutates that inode and is the operation to avoid.
+
+## Keep Formatter Churn Out Of Scoped Changes
+
+Before applying a formatter to a legacy shared owner, check whether it would rewrite
+unrelated lines. Format new files or edited regions without reformatting the rest of
+the owner.
+
+## Broaden A Helper On The Real Path
+
+Before pushing a config-backed entrypoint, or extending a helper from a narrow case
+set to a broader cohort, run the real structured config/prepare path at the broadest
+intended scope and enumerate the helper's semantic preconditions. Compile, import,
+or narrow-case checks are not sufficient.

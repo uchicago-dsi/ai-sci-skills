@@ -99,18 +99,63 @@ setting. Automatic notifications apply only to Claude sessions that load hooks.
 
 ## Notification Hooks
 
-User-level Codex and Claude hooks run `agentcomm notify` on session start, prompt
-submission, and tool completion. In Codex, trust the reviewed entries through
-`/hooks`; changed definitions require renewed trust.
+**Claude sessions now deliver mail automatically, and that delivery consumes.**
+`~/.claude/hooks/agentcomm_deliver.py` runs on session start, on every prompt,
+and mid-turn after a tool call (rate limited to once a minute). It resolves a
+name, registers it as a heartbeat, runs `agentcomm inbox --json`, and prints
+every body to stdout, which the harness puts into the conversation.
 
-- Mid-turn checks are limited to once per minute per recipient/session, and
-  unchanged inboxes are quiet.
-- Hooks only preview. They never consume mail and never wake an idle agent, so a
-  hook cannot keep your unread count or last-read stamp current no matter how
-  often it fires.
-- Every session consumes its inbox at task boundaries, hooks or no hooks. Having
-  hooks is the easiest way to believe you are on top of your mail while your
-  counters tell every peer the opposite.
+This reverses the older rule that a hook may only preview. That rule existed
+for a good reason -- a hook that archived mail would destroy messages the
+agent never saw -- and the reason applies only to a hook that *discards* what
+it read. Consuming and delivering in one step loses nothing, and it fixes the
+failure the preview design caused: reading and being told there was mail were
+two separate actions and only the second was automated, so unread depth and
+the last-read stamp stayed frozen while the agent worked, and peers steering
+on those two numbers concluded their message never landed. That cost two
+round trips in one day and once cost real work, when a peer killed two
+processes, said so by mail, and the processes were relaunched by an agent
+whose session was not attached to a mailbox.
+
+Which name a session binds comes from `AGENTCOMM_AGENT` first, then
+`~/.claude/agentcomm_identity.json`, which maps a working directory prefix to
+a name with the longest match winning. **A name is never guessed.** With no
+identity configured the hook consumes nothing and says so, because binding
+the wrong name reads another agent's mail and hides it from them. Do not add
+a directory to that map for a name another live agent is using.
+
+### Codex is different, and this file does not wire it
+
+Codex resolves hooks through its own `/hooks` trust flow and its own
+configuration, its lifecycle events are not Claude's, and a changed
+definition needs renewed trust. So a Codex session gets none of the above
+from `~/.claude/`, and must arrange the equivalent on its own terms: consume
+at task boundaries, or wire a digest through the Codex hook configuration.
+Until it does, **assume a Codex peer's counters lag its actual reading**, and
+do not read a stale last-read stamp on a Codex name as proof that nothing was
+received.
+
+Note also that `agentcomm notify` does not exist in the installed CLI
+(0.21.0) -- hooks calling it returned "notification unavailable" silently for
+as long as they were configured, which is how this went unnoticed. The
+maintained wiring commands, `agentcomm install` and `agentcomm hook <event>`,
+are deliberately refused by this installation's reviewed launcher, which is
+why the hook above is hand-written and reviewed rather than generated.
+
+### Still true regardless of hooks
+
+- A preview is not a read. If a digest is all you have seen, consume before
+  reporting work done.
+- Silence is not an empty inbox. Verify your identity resolves before
+  concluding nobody has written to you.
+- One watcher per job, not one per agent that cares.
+
+Give every Claude worker its own `AGENTCOMM_AGENT` value when launching or
+resuming through the Claude bridge. Do not inherit the manager's name. The
+bridge still owns launch, resume, quota recovery, and final results; the
+mailbox carries short questions, corrections, and coordination. The bridge's
+safe mode disables hooks, so relay unread steering in its next follow-up
+rather than removing that safety setting.
 
 ## What The Mailbox Is Not For
 

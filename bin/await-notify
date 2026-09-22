@@ -1,0 +1,139 @@
+#!/usr/bin/env bash
+# Register an out-of-process watcher that wakes an agent session when something
+# finishes, instead of having the agent wait for it.
+#
+# An agent that polls pays its whole context to learn that nothing has changed,
+# and an agent that blocks cannot do anything else meanwhile -- neither is
+# acceptable for a job that runs for 45 minutes. This detaches a watcher that
+# costs nothing while it waits, and delivers exactly one message when the event
+# actually happens. Codex accepts injected text into a live session: an idle one
+# takes it immediately, a busy one queues it to the next turn boundary.
+#
+# Usage:
+#   await-notify --to <tmux-target> [options] -- <await-event args...>
+#
+#   --to TARGET       tmux session or session:window.pane to wake (required)
+#   --mailbox AGENT   also send the full detail via `agentcomm send AGENT`
+#   --label TEXT      short human name for the thing being watched
+#   --timeout S       give up after S seconds total (default 86400)
+#   --interval S      seconds between internal polls (default 30)
+#
+# Everything after `--` is passed to await-event, so any event kind it supports
+# works here:
+#   await-notify --to <agent-session> --label "fan fit" -- slurm 15233526
+#   await-notify --to data/spock  --label "export"  -- file /path/to/DONE
+#
+# Prints one JSON registration receipt and returns immediately. The watcher runs
+# detached. Its ledger is $LEDGER below: a standing notification channel needs a
+# durable record, or a restart replays handled history as new events and a
+# silent failure looks exactly like a quiet system.
+set -uo pipefail
+
+PROG=await-notify
+STATE_DIR=${AWAIT_NOTIFY_STATE:-$HOME/.local/state/await-notify}
+LEDGER=$STATE_DIR/ledger.jsonl
+
+usage() {
+    cat >&2 <<'USAGE'
+await-notify --to <tmux-target> [options] -- <await-event args...>
+
+  --to TARGET       tmux session or session:window.pane to wake (required)
+  --mailbox AGENT   also send the full detail via `agentcomm send AGENT`
+  --label TEXT      short human name for the thing being watched
+  --timeout S       give up after S seconds total (default 86400)
+  --interval S      seconds between internal polls (default 30)
+
+Everything after `--` goes to await-event:
+  await-notify --to <agent-session> --label "fan fit" -- slurm 15233526
+  await-notify --to data/spock  --label "export"  -- file /path/to/DONE
+  await-notify --to <agent-session> --label "oom"     -- log train.log 'CUDA out of memory'
+
+Returns immediately with a JSON receipt; the watcher runs detached.
+USAGE
+    exit 2
+}
+
+TARGET= MAILBOX= LABEL= TIMEOUT=86400 INTERVAL=30
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --to)       TARGET=${2:?}; shift 2 ;;
+        --mailbox)  MAILBOX=${2:?}; shift 2 ;;
+        --label)    LABEL=${2:?}; shift 2 ;;
+        --timeout)  TIMEOUT=${2:?}; shift 2 ;;
+        --interval) INTERVAL=${2:?}; shift 2 ;;
+        -h|--help)  usage ;;
+        --)         shift; break ;;
+        *)          echo "$PROG: unknown option $1" >&2; usage ;;
+    esac
+done
+[[ -n $TARGET ]] || { echo "$PROG: --to is required" >&2; usage; }
+[[ $# -ge 1 ]]   || { echo "$PROG: nothing to watch (expected args after --)" >&2; usage; }
+
+command -v await-event >/dev/null 2>&1 || {
+    echo "$PROG: await-event not found on PATH" >&2; exit 3; }
+
+# Fail now, loudly, rather than detaching a watcher whose wake-up can never
+# land. A watcher pointed at a dead session is indistinguishable from a job
+# that never finished.
+tmux has-session -t "$TARGET" 2>/dev/null || {
+    echo "$PROG: no tmux session '$TARGET'" >&2; exit 4; }
+
+mkdir -p "$STATE_DIR"
+WATCH_ID=$(date +%Y%m%dT%H%M%S)-$$-$RANDOM
+LOG=$STATE_DIR/$WATCH_ID.log
+[[ -n $LABEL ]] || LABEL="$*"
+
+jstr() { python3 -c 'import json,sys; print(json.dumps(sys.argv[1]))' "$1" 2>/dev/null \
+         || printf '"%s"' "${1//\"/\\\"}"; }
+
+record() {  # append one ledger line; the ledger is the only durable evidence
+    printf '{"ts":%s,"watch_id":%s,"target":%s,"label":%s,"phase":%s,"detail":%s}\n' \
+        "$(date +%s)" "$(jstr "$WATCH_ID")" "$(jstr "$TARGET")" "$(jstr "$LABEL")" \
+        "$(jstr "$1")" "$(jstr "${2:-}")" >> "$LEDGER"
+}
+
+watcher() {
+    local start deadline out rc event
+    start=$(date +%s); deadline=$((start + TIMEOUT))
+    record registered "$*"
+    while :; do
+        local remaining=$(( deadline - $(date +%s) ))
+        (( remaining <= 0 )) && { out='{"event":"watch_timeout"}'; rc=10; break; }
+        local block=300; (( block > remaining )) && block=$remaining
+        out=$(await-event --interval "$INTERVAL" --max-block "$block" "$@" 2>&1); rc=$?
+        # rc 10 is "nothing yet, ask again"; anything else is terminal, including
+        # a usage error, which must surface rather than loop forever.
+        [[ $rc -ne 10 ]] && break
+    done
+    printf '%s\n' "$out" >> "$LOG"
+    record fired "$out"
+
+    # Detail goes to the mailbox; the pane gets a short notice pointing at it.
+    if [[ -n $MAILBOX ]] && command -v agentcomm >/dev/null 2>&1; then
+        agentcomm send "$MAILBOX" "watch fired: $LABEL -- $out" --subject status \
+            >/dev/null 2>&1 || record mailbox_failed "$MAILBOX"
+    fi
+
+    if ! tmux has-session -t "$TARGET" 2>/dev/null; then
+        record undeliverable "session gone: $TARGET"; return 5
+    fi
+    # Literal text first, then Enter as its own key after a beat. A single
+    # send-keys with the newline appended lands in the composer without being
+    # submitted; this is the shape that actually delivers.
+    tmux send-keys -t "$TARGET" -l "EVENT ($LABEL): $out"
+    sleep 1
+    tmux send-keys -t "$TARGET" Enter
+    record delivered "$out"
+}
+
+export -f watcher record jstr 2>/dev/null || true
+setsid bash -c "$(declare -f jstr record watcher); \
+    PROG=$(printf %q "$PROG") STATE_DIR=$(printf %q "$STATE_DIR") \
+    LEDGER=$(printf %q "$LEDGER") WATCH_ID=$(printf %q "$WATCH_ID") \
+    LOG=$(printf %q "$LOG") TARGET=$(printf %q "$TARGET") \
+    MAILBOX=$(printf %q "$MAILBOX") LABEL=$(printf %q "$LABEL") \
+    TIMEOUT=$(printf %q "$TIMEOUT") INTERVAL=$(printf %q "$INTERVAL"); \
+    watcher $(printf '%q ' "$@")" </dev/null >>"$LOG" 2>&1 &
+
+printf '{"event":"watch_registered","watch_id":%s,"target":%s,"label":%s,"ledger":%s,"log":%s}\n' \
+    "$(jstr "$WATCH_ID")" "$(jstr "$TARGET")" "$(jstr "$LABEL")" "$(jstr "$LEDGER")" "$(jstr "$LOG")"

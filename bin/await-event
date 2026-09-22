@@ -1,0 +1,210 @@
+#!/usr/bin/env bash
+# Block until something interesting happens, then print one line and exit.
+#
+# The point is to move the polling loop out of the model's control loop. A model
+# that re-enters on every poll pays its whole context to learn that nothing has
+# changed; this polls in a shell process, which costs nothing, and returns once.
+#
+# Exit codes
+#   0   the event fired; stdout holds one JSON object describing it
+#   10  --max-block elapsed with no event; stdout says still_waiting
+#   2   usage or environment error
+
+set -uo pipefail
+
+INTERVAL=30
+MAX_BLOCK=900
+PROG=${0##*/}
+
+usage() {
+    cat >&2 <<'USAGE'
+usage: await-event [--interval S] [--max-block S] <kind> <args...>
+
+  await-event slurm <jobid> [jobid...]   any listed job reaches a terminal state
+  await-event file <path>                path exists and its size stops changing
+  await-event pid <pid>                  process exits
+  await-event log <path> <regex>         regex appears in newly appended bytes
+  await-event cmd <command...>           command exits 0
+
+  --interval S    seconds between internal polls (default 30)
+  --max-block S   give up and return still_waiting after S seconds (default 900)
+
+Always returns exactly one JSON line. Nothing is printed while waiting.
+USAGE
+    exit 2
+}
+
+emit() { printf '%s\n' "$1"; }
+
+# JSON string escaping for values that may contain quotes or newlines.
+jstr() {
+    printf '%s' "$1" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))' 2>/dev/null \
+        || printf '"%s"' "${1//\"/\\\"}"
+}
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --interval)  INTERVAL=${2:?}; shift 2 ;;
+        --max-block) MAX_BLOCK=${2:?}; shift 2 ;;
+        -h|--help)   usage ;;
+        --)          shift; break ;;
+        -*)          echo "$PROG: unknown option $1" >&2; usage ;;
+        *)           break ;;
+    esac
+done
+[[ $# -ge 1 ]] || usage
+
+KIND=$1; shift
+START=$(date +%s)
+elapsed() { echo $(( $(date +%s) - START )); }
+expired() { [[ $(elapsed) -ge $MAX_BLOCK ]]; }
+
+# Sleep until the next poll without ever running past the deadline. A fixed
+# interval that does not divide MAX_BLOCK overshoots it, and when the caller's
+# own timeout is tighter than the overshoot the entire result is lost rather
+# than late: --interval 10 --max-block 25 next checks at 30s, one second past a
+# 29s Code Mode yield, so the caller sees an empty string and no still_waiting.
+nap() {
+    local remaining=$(( MAX_BLOCK - $(elapsed) ))
+    (( remaining <= 0 )) && return 0
+    local s=$INTERVAL
+    (( s > remaining )) && s=$remaining
+    sleep "$s"
+}
+
+still_waiting() {
+    emit "{\"event\":\"still_waiting\",\"kind\":\"$KIND\",\"detail\":$(jstr "$1"),\"elapsed_s\":$(elapsed)}"
+    exit 10
+}
+
+# --- slurm ------------------------------------------------------------------
+# Queue absence or an expired job ID requires explicit terminal accounting.
+# Scheduler RPC failures and delayed accounting leave the job unresolved.
+slurm_state() {
+    local id=$1 row
+    row=$(sacct -j "$id" -X -n -P -o State,ExitCode,Elapsed 2>/dev/null | head -1)
+    [[ -n $row ]] && printf '%s' "$row"
+}
+
+await_slurm() {
+    [[ $# -ge 1 ]] || usage
+    command -v squeue >/dev/null || { echo "$PROG: squeue not found" >&2; exit 2; }
+    local ids=("$@") id live state
+    while :; do
+        for id in "${ids[@]}"; do
+            if ! live=$(LC_ALL=C squeue -h -j "$id" -o '%T' 2>&1); then
+                case "$live" in
+                    *"Invalid job id specified"*) live= ;;
+                    *) continue ;;
+                esac
+            fi
+            if [[ -z $live ]]; then
+                state=
+                # Left the queue. Give sacct a moment to record the outcome.
+                # sacct lags squeue, but not past the deadline: a late answer the
+                # deadline bounds waiting when no terminal record is available.
+                local tries=0
+                while [[ $tries -lt 6 ]] && [[ $(elapsed) -lt $((MAX_BLOCK + 3)) ]]; do
+                    state=$(slurm_state "$id")
+                    [[ -n $state ]] && break
+                    sleep 5; tries=$((tries+1))
+                done
+                local st=${state%%|*} rest=${state#*|} code el
+                code=${rest%%|*}; el=${rest##*|}
+                case "${st%% *}" in
+                    COMPLETED|FAILED|CANCELLED|TIMEOUT|OUT_OF_MEMORY|NODE_FAIL|PREEMPTED|BOOT_FAIL|DEADLINE|REVOKED) ;;
+                    *) continue ;;
+                esac
+                emit "{\"event\":\"slurm_terminal\",\"job_id\":\"$id\",\"state\":$(jstr "${st:-UNKNOWN}"),\"exit_code\":$(jstr "${code:-}"),\"elapsed\":$(jstr "${el:-}"),\"waited_s\":$(elapsed)}"
+                return 0
+            fi
+        done
+        expired && still_waiting "jobs still queued or running: ${ids[*]}"
+        nap
+    done
+}
+
+# --- file -------------------------------------------------------------------
+# Existence is not completeness: wait for the size to hold steady across two
+# polls so a partially written file is not reported as ready.
+await_file() {
+    local path=${1:?}; local last=-1 size
+    while :; do
+        if [[ -e $path ]]; then
+            size=$(stat -c %s -- "$path" 2>/dev/null || echo -1)
+            if [[ $size -ge 0 && $size -eq $last ]]; then
+                emit "{\"event\":\"file_ready\",\"path\":$(jstr "$path"),\"bytes\":$size,\"waited_s\":$(elapsed)}"
+                return 0
+            fi
+            last=$size
+        fi
+        expired && still_waiting "not present or still growing: $path"
+        nap
+    done
+}
+
+# --- pid --------------------------------------------------------------------
+# Keyed on the pid itself, never on a command-line match: a pgrep -f pattern
+# also matches this watcher's own arguments and would never terminate.
+await_pid() {
+    local pid=${1:?}
+    kill -0 "$pid" 2>/dev/null || {
+        emit "{\"event\":\"process_gone\",\"pid\":$pid,\"note\":\"already exited or not visible\",\"waited_s\":0}"
+        return 0
+    }
+    while kill -0 "$pid" 2>/dev/null; do
+        expired && still_waiting "pid $pid still running"
+        nap
+    done
+    emit "{\"event\":\"process_exited\",\"pid\":$pid,\"waited_s\":$(elapsed)}"
+}
+
+# --- log --------------------------------------------------------------------
+# Scans only bytes appended since the last poll, so a pattern that was already
+# in the file before the watch started does not fire immediately.
+await_log() {
+    local path=${1:?} pat=${2:?} off=0 size chunk hit
+    [[ -e $path ]] && off=$(stat -c %s -- "$path" 2>/dev/null || echo 0)
+    while :; do
+        if [[ -e $path ]]; then
+            size=$(stat -c %s -- "$path" 2>/dev/null || echo 0)
+            if [[ $size -gt $off ]]; then
+                chunk=$(tail -c +$((off+1)) -- "$path" 2>/dev/null | head -c 2000000)
+                hit=$(printf '%s' "$chunk" | grep -m1 -E -- "$pat" 2>/dev/null)
+                off=$size
+                if [[ -n $hit ]]; then
+                    emit "{\"event\":\"log_match\",\"path\":$(jstr "$path"),\"pattern\":$(jstr "$pat"),\"line\":$(jstr "${hit:0:400}"),\"waited_s\":$(elapsed)}"
+                    return 0
+                fi
+            elif [[ $size -lt $off ]]; then
+                off=$size   # truncated or rotated
+            fi
+        fi
+        expired && still_waiting "no match yet in $path"
+        nap
+    done
+}
+
+# --- cmd --------------------------------------------------------------------
+await_cmd() {
+    [[ $# -ge 1 ]] || usage
+    local out rc
+    while :; do
+        out=$("$@" 2>&1); rc=$?
+        if [[ $rc -eq 0 ]]; then
+            emit "{\"event\":\"command_succeeded\",\"output\":$(jstr "${out:0:400}"),\"waited_s\":$(elapsed)}"
+            return 0
+        fi
+        expired && still_waiting "command still failing (rc=$rc)"
+        nap
+    done
+}
+
+case "$KIND" in
+    slurm) await_slurm "$@" ;;
+    file)  await_file  "$@" ;;
+    pid)   await_pid   "$@" ;;
+    log)   await_log   "$@" ;;
+    cmd)   await_cmd   "$@" ;;
+    *)     echo "$PROG: unknown kind '$KIND'" >&2; usage ;;
+esac

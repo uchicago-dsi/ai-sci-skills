@@ -24,7 +24,26 @@ Each skill is intentionally compact. The shared versions encode decision rules a
 | `maintenance-pass` | Trim dead code, vestiges, and duplication without churn |
 | `research-code-parsimony` | Reuse existing owners and cut over cleanly instead of growing code |
 | `claude-code-worker` | Delegate isolated Claude Code tasks with resumable sessions and quota-aware recovery |
-| `pi-progress-synthesis` | Turn research results into evidence-backed scientific progress updates and decision-focused stories |
+| `agentcomm` | Let agents coordinate with each other through a shared mailbox |
+| `quota-saving-mode` | Cut the model requests spent on polling, waiting, and status chatter |
+| `humanize` | Edit prose so it sounds like the author and reads plainly |
+
+### Agents talking to each other
+
+`agentcomm` gives several agents working on one problem a shared mailbox, so
+they can hand off, ask each other questions, and say when something is done
+without a person relaying it.
+
+It is most useful across harnesses. Claude Code can already message other Claude
+sessions directly, so two Claude agents need no help from this. A Claude agent
+and a Codex agent cannot see each other at all, and the mailbox is what lets
+them coordinate: a durable name each, a roster showing who is reading, and read
+state that tells a peer whether a question has actually been picked up.
+
+`quota-saving-mode` uses it for the same reason, to deliver a wake-up when a
+long job finishes rather than having an agent poll for it. That skill ships
+`bin/await-notify` and `bin/await-event` for harnesses without built-in
+background notification; Claude Code has its own and does not need them.
 
 ## Installation
 

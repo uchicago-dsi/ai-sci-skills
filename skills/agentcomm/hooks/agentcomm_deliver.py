@@ -51,18 +51,32 @@ from pathlib import Path
 AGENTCOMM = Path.home() / ".local" / "bin" / "agentcomm"
 IDENTITY_MAP = Path.home() / ".claude" / "agentcomm_identity.json"
 STAMP_DIR = Path.home() / ".claude" / ".agentcomm_stamps"
+# One file per bound name, recording which session holds it. This is what makes
+# the directory map safe when two agents run in one tree: the directory says
+# which name a session *wants*, and the claim says whether it may have it.
+CLAIM_DIR = Path.home() / ".claude" / ".agentcomm_claims"
+# How long a claim survives without a heartbeat. A session that has gone away
+# should not hold a name forever, and every hook event refreshes the claim, so
+# a live session renews far more often than this.
+CLAIM_STALE_SECONDS = 6 * 60 * 60
 # Mid-turn delivery is rate limited; prompt and session start are not, because
 # those are boundaries where the cost of a check is negligible and the cost of
 # missing steering is a wasted turn.
 MIDTURN_INTERVAL_SECONDS = 60
 
 
-def configured_identity(cwd):
+def configured_identity(cwd, session_id=None):
     """The name this session should bind, from the environment or the map.
 
     Never inferred from the directory alone when the environment disagrees:
     two Claude sessions in one repository would otherwise claim one name and
     silently consume each other's mail.
+
+    `by_session` keys on the harness session id and is checked before
+    `by_directory`, because several agents commonly run from one checkout and
+    the directory then identifies none of them. The session id is the only
+    discriminator that survives that arrangement without relying on each
+    session having been launched with the right environment.
     """
     from_env = os.environ.get("AGENTCOMM_AGENT")
     if from_env:
@@ -73,12 +87,61 @@ def configured_identity(cwd):
         mapping = json.loads(IDENTITY_MAP.read_text())
     except (ValueError, OSError):
         return None
+    if session_id:
+        by_session = mapping.get("by_session", {}).get(session_id)
+        if by_session:
+            return by_session
     best = None
     for prefix, name in mapping.get("by_directory", {}).items():
         # Longest matching prefix wins, so a worktree can override its parent.
         if cwd.startswith(prefix) and (best is None or len(prefix) > len(best[0])):
             best = (prefix, name)
     return best[1] if best else mapping.get("default")
+
+
+def claim_name(name, session_id, cwd):
+    """Take the name for this session, or report the session already holding it.
+
+    Returns None when the name is ours to use. A name belongs to one session at a
+    time: the first to claim it keeps it while it keeps checking in, and any other
+    session is refused rather than quietly reading its mail.
+
+    This is what makes `by_directory` safe to keep. Two agents started in the same
+    checkout resolve to the same name, and without this the second consumes the
+    first's inbox and hides it, which no counter afterwards can reveal. That
+    happened twice here in one day. `by_session` prevents it when someone has
+    configured it; this prevents it when nobody has.
+
+    A session that cannot be identified is refused rather than allowed to share,
+    because an unidentifiable session is exactly the one that cannot be shown to
+    be the rightful holder.
+    """
+    if not session_id:
+        return {"session_id": "(unidentifiable session)", "cwd": cwd}
+    try:
+        CLAIM_DIR.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        # Without somewhere to record claims this cannot enforce anything, and
+        # blocking delivery on a filesystem problem would be its own failure.
+        return None
+    path = CLAIM_DIR / (str(name).replace("/", "_") + ".json")
+    now = time.time()
+    held = None
+    if path.is_file():
+        try:
+            held = json.loads(path.read_text())
+        except (ValueError, OSError):
+            held = None
+    if (held and held.get("session_id") and held.get("session_id") != session_id
+            and now - float(held.get("last_seen", 0)) < CLAIM_STALE_SECONDS):
+        return held
+    try:
+        path.write_text(json.dumps(
+            {"session_id": session_id, "cwd": cwd, "name": name, "last_seen": now},
+            indent=2) + "\n")
+    except OSError:
+        pass
+    return None
 
 
 def run(args, name):
@@ -151,15 +214,42 @@ def main():
     if rate_limited(event):
         return 0
 
+    # The harness passes the event payload on stdin. It carries the session id,
+    # which is what tells two agents in one checkout apart. A hook that cannot
+    # read it still works; it just falls back to the directory.
+    session_id = None
+    try:
+        if not sys.stdin.isatty():
+            session_id = (json.loads(sys.stdin.read() or "{}") or {}).get("session_id")
+    except (ValueError, OSError):
+        session_id = None
+
     cwd = os.getcwd()
-    name = configured_identity(cwd)
+    name = configured_identity(cwd, session_id)
     if not name:
         if event == "session-start":
             print("AGENTCOMM: no identity for this session, so peer mail is NOT "
                   "being delivered and none has been consumed. Set "
-                  "AGENTCOMM_AGENT, or add this directory to "
-                  "~/.claude/agentcomm_identity.json under by_directory. Do not "
-                  "bind a name another live agent is using.")
+                  "AGENTCOMM_AGENT, or add this session to "
+                  "~/.claude/agentcomm_identity.json under by_session"
+                  + (f' (this session is "{session_id}")' if session_id else "")
+                  + ", or its directory under by_directory. Do not bind a name "
+                  "another live agent is using.")
+        return 0
+
+    # One session per name. Refusing is the entire safety property: the cost of
+    # sharing a name is that one agent silently reads and archives the other's
+    # mail, which no counter afterwards can reveal.
+    held = claim_name(name, session_id, cwd)
+    if held:
+        if event != "midturn":
+            print("AGENTCOMM: NOT delivering. The name %r is held by another live "
+                  "session (%s, in %s), so consuming it here would read that "
+                  "agent's mail and hide it from them. Nothing was consumed.\n"
+                  "Set AGENTCOMM_AGENT to this session's own name, which "
+                  "overrides the directory map. The map keys on directory alone "
+                  "and cannot tell two agents in one tree apart."
+                  % (name, held.get("session_id", "?"), held.get("cwd", "?")))
         return 0
 
     # Registering every time is a heartbeat as well as a bind: `agents` reports

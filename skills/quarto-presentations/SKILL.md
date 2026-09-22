@@ -55,6 +55,20 @@ quarto render slides.qmd
 
 - Do not pass `--to pdf` or `--to html` for reveal.js decks unless the deck explicitly documents that path. It can bypass the reveal.js slide format and produce article-like output.
 - Keep heavy analyses out of the deck. Prefer sidecar scripts that write finished figures to `figures/`, then reference those files from slides.
+- For remote preview, verify the exact slide URL returns HTTP 200 from the serving
+  host and leave the server alive when handing it to the user. An exported HTML/PDF
+  is not a running preview. SSH's local listening port and the server port are
+  independent: a server-side free-port check cannot detect a laptop conflict.
+  Use explicit loopback forwarding with `ExitOnForwardFailure=yes`; resolve a
+  local bind conflict by changing the local port and browser URL, not the server
+  port or an unidentified existing listener.
+  If automating this, retry only an occupied requested local port, stop on
+  authentication/host-key/network failures, and verify a deck-specific identity
+  through the tunnel before printing its URL. When a return-to-prompt workflow
+  is requested, leave the verified tunnel in the background and print a compact
+  connection report plus a command to close only that helper's own tunnel.
+  Run the helper on the laptop, not on the remote server. Verify slide content separately: a correct tunnel
+  may still serve an unfinished template or an older rendered version.
 
 ## Export PDF
 

@@ -1,0 +1,6 @@
+interface:
+  display_name: "Humanize"
+  short_description: "Make prose direct, natural, and recognizably yours"
+  default_prompt: "Use $humanize to revise this prose in place while preserving my meaning and voice."
+policy:
+  allow_implicit_invocation: false

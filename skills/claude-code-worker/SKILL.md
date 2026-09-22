@@ -1,6 +1,6 @@
 ---
 name: claude-code-worker
-description: "Delegate a bounded coding, review, or research subtask from Codex to Claude Code in an isolated Git worktree, then continue the same Claude session with follow-up turns. Use when the user explicitly asks for Claude/Claude Code delegation, asks to save Codex quota with Claude, or requests a Claude worker that can inspect and edit a repository. Do not use for PHI, credentials, authoritative imaging, source-data mutation, external publication, or a task that cannot safely be isolated."
+description: "Delegate a bounded coding, review, or research subtask from Codex to Claude Code in an isolated Git worktree, then continue the same Claude session with follow-up turns. Use when the user explicitly asks for Claude/Claude Code delegation, asks to save Codex quota with Claude, or requests a Claude worker that can inspect and edit a repository. Do not use for PHI or credentials, authoritative imaging, source-data mutation, external publication, or a task that cannot safely be isolated; de-identified study identifiers are fine."
 ---
 
 # Claude Code Worker
@@ -30,8 +30,10 @@ work, stop delegating that task shape even when Claude quota is free.
    Do not improvise a second worktree under `/tmp`; inspect a baseline with `git show` or a
    worktree created under the configured root.
 4. Create the state directory outside the worktree. Use a protected directory when the
-   prompt or result is private. Never put PHI, credentials, patient identifiers, source
-   imaging, or protected clinical text in the prompt or worker-visible paths.
+   prompt or result is private. Keep PHI, credentials and protected clinical text out of
+   the prompt and out of worker-visible paths. De-identified study identifiers -- the
+   accession or subject keys a de-identified cohort is organized by -- are fine, and a
+   worker usually cannot do the work without them.
 5. Write a self-contained prompt that includes:
    - the exact outcome and boundaries;
    - relevant user constraints and applicable repository rules;

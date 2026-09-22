@@ -34,6 +34,36 @@ commit is issued:
 git commit -- path/one path/two   # index cannot decide what you commit
 ```
 
+## Enumerate Files, Never A Directory
+
+A path-scoped commit takes the working-tree state of everything matching the
+pathspec, so a directory in that pathspec silently widens the commit to every
+modified file beneath it, including another owner's. `git commit -- scripts/`
+intended to carry 21 files and carried 27: the extra six were a concurrent
+owner's in-flight edits, which went from unstaged work in their tree to pinned
+in someone else's commit. Their `git status` then reads clean, which is
+misleading rather than reassuring, and the commit is not a valid execution pin
+for either owner's change.
+
+So enumerate the files. If the list is long enough to be tempting to collapse,
+that is a sign the change should be several commits.
+
+## Check The Resolved File List, Not The Index
+
 Printing the index without reading it is a performative check, not a real one.
-Read the output and stop on an unexpected path, or use an explicit pathspec so the
-index cannot decide what you commit.
+Read the output and stop on an unexpected path.
+
+Reading the index is also the wrong object when the commit is path-scoped,
+because such a commit bypasses the index entirely. An index verified to hold
+exactly the intended paths gives real confidence about a staged commit and none
+at all about `git commit -- <paths>`; that mismatch is how the six files above
+got through a check that passed. Verify what the commit will actually take:
+
+```bash
+git commit --dry-run -- path/one path/two    # the resolved list, before it lands
+```
+
+Then compare that list against your own change set — ideally its source, such as
+the isolated worktree or branch the work was developed in — rather than against
+your memory of it. In a shared checkout the difference between the two is exactly
+the other owner's work.

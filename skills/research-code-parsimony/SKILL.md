@@ -142,6 +142,19 @@ rules do not restrict it.
   serialized-input field contract on one real current row. A matching name is not an
   interface contract.
 
+## Test A Serialization Boundary By Round Trip
+
+At a CSV or JSON serialization boundary, normalize and validate typed fields
+explicitly. Serialization is lossy about type in ways that stay invisible until a
+consumer reads the file: an integer comes back as text, a missing identifier
+deserializes as a float `NaN` and then enters numeric aggregation, a boolean becomes
+the string `"False"` which is truthy.
+
+An in-memory type match is not a serialization contract. Before any fan-out, exercise
+the real path end to end on one real case — producer write, serialized read, and
+whatever the reducer or finalizer validates — and require clean logs. Checking the
+object you are about to write tests the wrong half; the defect lives in the round trip.
+
 ## Name By Role, Not By Chronology
 
 - Name scripts, modules, entrypoints, and config files by their scientific or

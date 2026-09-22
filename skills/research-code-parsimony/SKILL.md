@@ -195,6 +195,23 @@ When one exists, either wait, or write the replacement to a new path and `mv` it
 over the target so the running process keeps its original inode. An in-place edit
 mutates that inode and is the operation to avoid.
 
+## Scope A Guardrail To A Bounded Window
+
+Scope a log or stream guardrail to a bounded window with an explicit boundary rather
+than forbidding a marker anywhere in the artifact. Orderly teardown routinely emits
+error text that healthy execution produced, so a rule that greps the whole artifact
+rejects working runs.
+
+Validate a rejection rule against a real passing artifact as well as against every
+failure shape it must still catch. A guardrail proven only against the failure it was
+written for is half tested; the question that matters is what makes it fire wrongly.
+
+Never place a guardrail that can reject an already completed run immediately before an
+irreversible reduction, and keep it outside any hash-bound owner set. Repairing a false
+positive inside that set re-binds provenance, and the affected run can then no longer be
+reduced under its own producing commit — so the fix for a spurious rejection destroys the
+result it was trying to protect.
+
 ## Keep Formatter Churn Out Of Scoped Changes
 
 Before applying a formatter to a legacy shared owner, check whether it would rewrite

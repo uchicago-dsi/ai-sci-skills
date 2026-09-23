@@ -23,6 +23,24 @@ tested against real negatives as well as real positives.
 Every refusal carries the fix. "Refused" alone gets worked around; "create a
 pinned worktree and submit from it, like this" gets satisfied.
 
+## Which agents these work in
+
+Claude Code and Codex, and nothing else yet.
+
+Both expose a hook system with a `PreToolUse` event that can refuse a call,
+and both pass the same payload, so one script serves both. Other coding
+agents -- Cursor, Aider, Copilot's agent mode, Gemini CLI and the rest -- do
+not currently expose a pre-tool interception point a guard could attach to.
+Some have lifecycle or notification callbacks, which can tell you a thing
+happened; none of those can refuse it before it runs, and a guard that only
+reports is not a guard.
+
+So a rule that matters in an agent other than these two has to stay written
+down, in `AGENTS.md` or `CLAUDE.md`, where it competes for attention. Check
+before assuming a hook covers everyone on a project: a rule removed from the
+prose because "the hook catches it" protects nobody in an agent that cannot
+run the hook.
+
 ## What each one does
 
 | script | event | refuses |

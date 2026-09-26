@@ -1,0 +1,238 @@
+#!/usr/bin/env bash
+# Watch Slurm jobs and post what changes to Slack (via slack-notify).
+#
+#   slurm-slack-watch 123456 123457 ...
+#   slurm-slack-watch --dry-report 123456   # print a finished job's report, don't post
+#
+# Notify only: it never cancels or resubmits. Those need judgment (is this a
+# known crash or something new?), so they stay with a person or a supervising
+# agent. Run it detached so it outlives the terminal and the agent session:
+#
+#   setsid nohup slurm-slack-watch 123456 123457 \
+#     > ~/.local/state/slurm-slack-watch-$(date +%F-%H%M).log 2>&1 < /dev/null &
+#
+# Stop it by PID (kill <pid>), not `pkill -f slurm-slack-watch`: -f matches full
+# command lines, including the shell that runs the pkill.
+#
+# A job's "run dir" is the directory of its --output log. Optional settings
+# (environment, or the config file):
+#   SSW_PROGRESS_GLOB   files that count as progress, relative to the run dir,
+#                       e.g. 'units/*.json'. Unset = no progress counts.
+#   SSW_TOTAL           expected number of those files, shown as done/total
+#   SSW_LOGS            extra logs to scan, space-separated, relative to the run dir
+#   SSW_READY_RE        a log line meaning "the service is up"; enables the
+#                       survived-startup check
+#   SSW_ERROR_RE        log lines that count as a runtime error
+#   SSW_QUOTE_ERRORS=0  leave log lines out of Slack (for logs that may hold data)
+#   SSW_EARLY_MIN=10    a GPU crash sooner than this counts as "early" (likely repeatable)
+#   SSW_POLL=60  SSW_SURVIVE=150  SSW_SUMMARY=3600  SSW_MIN_GAIN=5  SSW_HEARTBEAT=21600
+set -uo pipefail
+
+here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+cfg=${SLACK_NOTIFY_CONFIG:-$HOME/.config/slack-notifications/config}
+[[ -r $cfg ]] && source "$cfg"
+
+POLL=${SSW_POLL:-60}              # seconds between checks
+SURVIVE=${SSW_SURVIVE:-150}       # seconds past READY that count as "survived startup"
+SUMMARY=${SSW_SUMMARY:-3600}      # how often to consider posting a progress summary
+MIN_GAIN=${SSW_MIN_GAIN:-5}       # ...posted only if a job gained this much progress
+HEARTBEAT=${SSW_HEARTBEAT:-21600} # or changed state; else "still watching" after this silence
+ERROR_RE=${SSW_ERROR_RE:-'Traceback|Error:|CUDA error|NCCL error|CUBLAS_STATUS|out of memory|Killed|Segmentation fault'}
+READY_RE=${SSW_READY_RE:-}
+# Reports also look for missing-file messages. Live alerts don't: "not found" in
+# a running job's log is too often harmless.
+REPORT_RE="$ERROR_RE|No such file or directory|not found"
+EARLY_MIN=${SSW_EARLY_MIN:-10}
+
+LAST_POST=$(date +%s)
+notify() {
+  if [[ -n ${DRY:-} ]]; then printf '%s\n' "$*"; LAST_POST=$(date +%s); return; fi
+  if "$here/slack-notify" "$*"; then LAST_POST=$(date +%s)
+  else echo "$(date +%T) slack post failed (message not repeated here)" >&2; fi
+}
+log() { echo "$(date '+%F %T') $*"; }
+
+# Per-job state, keyed by job id. The per-attempt entries reset whenever Slurm's
+# Start time changes, because a requeued job keeps its id.
+declare -A name dir outlog state start ready_at survived errored prev_prog prev_state offset
+
+progress() {  # prints a count, or nothing when progress isn't configured
+  [[ -n ${SSW_PROGRESS_GLOB:-} ]] || return 0
+  compgen -G "${dir[$1]}/$SSW_PROGRESS_GLOB" | wc -l
+}
+show_prog() { local p; p=$(progress "$1"); [[ -n $p ]] && echo "${p}${SSW_TOTAL:+/$SSW_TOTAL}"; }
+
+logs_of() { printf '%s\n' "${outlog[$1]}"; local l; for l in ${SSW_LOGS:-}; do printf '%s\n' "${dir[$1]}/$l"; done; }
+
+# Remember how big each log is when an attempt starts, and read only what is
+# written after that. This works whether a requeued job appends to its log
+# or truncates it (a file smaller than its offset was rewritten: read it all).
+mark_offsets() {
+  local j=$1 l
+  while read -r l; do offset["$j|$l"]=$(stat -c %s "$l" 2>/dev/null || echo 0); done < <(logs_of "$j")
+}
+fresh() {  # this attempt's part of every log of job $1
+  local j=$1 l off size
+  while read -r l; do
+    [[ -f $l ]] || continue
+    off=${offset["$j|$l"]:-0}; size=$(stat -c %s "$l")
+    (( size < off )) && off=0
+    tail -c +$((off + 1)) "$l"
+  done < <(logs_of "$j")
+}
+minutes() {  # Slurm elapsed ([D-]HH:MM:SS or MM:SS) -> whole minutes
+  local e=$1 d=0 h=0 m=0
+  [[ $e == *-* ]] && { d=${e%%-*}; e=${e#*-}; }
+  IFS=: read -r -a f <<<"$e"
+  if (( ${#f[@]} == 3 )); then h=${f[0]}; m=${f[1]}; else m=${f[0]}; fi
+  echo $(( 10#$d*1440 + 10#$h*60 + 10#$m ))
+}
+tidy() { sed -E 's/^\([^)]*\) //; s/^[A-Z]+ [0-9-]+ [0-9:]+ \[[^]]*\] //' | cut -c1-200; }
+quote() { [[ ${SSW_QUOTE_ERRORS:-1} == 0 ]] && echo "(omitted: SSW_QUOTE_ERRORS=0)" || echo "${1:-none}"; }
+
+# Failure report: evidence plus a generic classification. Extend the FAILED
+# branch with site-specific rules (a known crash signature, a flaky node) in a
+# local copy rather than in the shared script.
+report() {
+  local j=$1 s=$2 node elapsed exitc text hits first last cause next mins since
+  IFS='|' read -r node elapsed exitc < <(sacct -j "$j" -X -n -P -o NodeList,Elapsed,ExitCode)
+  text=$(fresh "$j")
+  # Skip Python's traceback header: the error itself is the traceback's last line.
+  hits=$(grep -E -- "$REPORT_RE" <<<"$text" | grep -v 'Traceback (most recent call last)')
+  first=$(head -1 <<<"$hits" | tidy); last=$(tail -1 <<<"$hits" | tidy)
+  case $s in
+    TIMEOUT)       cause="Hit its time limit."
+                   next="Resubmit if the job resumes from checkpoints; otherwise raise --time." ;;
+    PREEMPTED|REQUEUED)
+                   cause="Preempted by higher-priority work (not a code problem)."
+                   next="None if the job is requeueable; Slurm restarts it." ;;
+    OUT_OF_MEMORY) cause="Host memory (RAM) exhausted."
+                   next="Raise --mem or reduce parallelism before resubmitting." ;;
+    NODE_FAIL)     cause="The node itself failed."
+                   next="Resubmit; report the node to admins if it repeats." ;;
+    CANCELLED*)    cause="Cancelled by a user or an admin."
+                   next="Find out who cancelled it before resubmitting." ;;
+    COMPLETED)     cause="Finished, but progress is only $(show_prog "$j")."
+                   next="Check which items are missing before trusting the output." ;;
+    *)
+      if grep -qE "CUDA out of memory|OutOfMemoryError" <<<"$text"; then
+        cause="GPU memory exhausted."; next="Needs a config change (batch/context size), not a plain resubmit."
+      elif grep -qE "CUDA error|NCCL error|CUBLAS_STATUS|illegal memory access" <<<"$text"; then
+        # How long it ran before crashing separates a repeatable early crash from
+        # an intermittent one. Prefer time since the service came up (seen live);
+        # otherwise fall back to Slurm's elapsed time, which includes startup.
+        if [[ -n ${ready_at[$j]:-} ]]; then mins=$(( ($(date +%s) - ready_at[$j]) / 60 )); since="after the service came up"
+        else mins=$(minutes "${elapsed:-0:0}"); since="after the job started"; fi
+        if (( mins >= EARLY_MIN )); then
+          cause="GPU crash mid-run (~$mins min $since)."
+          next="If this crash is known and intermittent, resubmit to resume; if new, investigate first."
+        else
+          cause="GPU crash early (~$mins min $since)."
+          next="Don't blindly resubmit: a repeatable early crash will recur. Investigate first."
+        fi
+      elif grep -qE "Killed|oom-kill" <<<"$text"; then
+        cause="Process killed, probably by the out-of-memory killer."; next="Raise --mem or reduce parallelism."
+      elif grep -qE "No such file or directory|FileNotFoundError|not found" <<<"$text"; then
+        cause="A file or path was missing."; next="Fix the path or input, then resubmit."
+      elif [[ -n $last ]]; then
+        cause="Runtime error."; next="Read the last error below; resubmitting won't help until it's fixed."
+      else
+        cause="Unrecognised failure."; next="Needs a person to read the logs."
+      fi ;;
+  esac
+  notify ":warning: *Issue report: $j ${name[$j]}*
+• Slurm state: $s (exit ${exitc:-?}) on ${node:-?} after ${elapsed:-?}
+• Progress: $(show_prog "$j" || true)
+• Likely cause: $cause
+• First error: $(quote "$first")
+• Last error: $(quote "$last")
+• Suggested next step: $next
+• Run dir: ${dir[$j]}"
+}
+
+# Progress summary of every job, posted only when something changed
+# substantially since the last summary actually posted. Baselines move only
+# when posting, so slow progress still accumulates into an update.
+summary() {
+  local j p gain changed=0 lines=()
+  for j in "${jobs[@]}"; do
+    p=$(progress "$j"); gain=$(( ${p:-0} - ${prev_prog[$j]:-0} ))
+    if (( gain >= MIN_GAIN )) || [[ ${state[$j]} != "${prev_state[$j]:-}" ]]; then changed=1; fi
+    lines+=("• $j ${name[$j]}: ${state[$j]:-?}${p:+, $(show_prog "$j") (+$gain since last update)}")
+  done
+  if (( changed )) || [[ ${1:-} == force ]]; then
+    notify ":bar_chart: Progress update $(date +%H:%M)"$'\n'"$(printf '%s\n' "${lines[@]}")"
+    for j in "${jobs[@]}"; do prev_prog[$j]=$(progress "$j"); prev_state[$j]=${state[$j]}; done
+  elif (( $(date +%s) - LAST_POST >= HEARTBEAT )); then
+    notify ":zzz: Still watching ${#jobs[@]} jobs; no substantial change in $((HEARTBEAT/3600))+ h."
+  fi
+}
+
+setup_job() {  # $1 = job id; finds its name and run dir while it's still known
+  local j=$1 out
+  out=$(scontrol show job "$j" 2>/dev/null | grep -oP 'StdOut=\K\S+')
+  [[ -n $out ]] || out=$(sacct -j "$j" -X -n -P -o StdOut 2>/dev/null)   # newer Slurm only
+  out=${out//%j/$j}
+  name[$j]=$(sacct -j "$j" -X -n -P -o JobName | head -1)
+  outlog[$j]=$out; dir[$j]=${out%/*}; state[$j]=""; start[$j]=""
+}
+
+if [[ ${1:-} == --dry-report ]]; then
+  DRY=1; j=${2:?usage: slurm-slack-watch --dry-report JOBID}
+  setup_job "$j"
+  # Finished jobs drop out of scontrol, and older Slurm has no StdOut in sacct:
+  # then point SSW_DRY_LOG at the job's --output log.
+  [[ -n ${outlog[$j]} ]] || { outlog[$j]=${SSW_DRY_LOG:?"can't find $j's log; set SSW_DRY_LOG"}; dir[$j]=${outlog[$j]%/*}; }
+  report "$j" "$(sacct -j "$j" -X -n -o State | awk '{print $1}')"; exit 0
+fi
+
+(( $# > 0 )) || { echo "usage: slurm-slack-watch JOBID..." >&2; exit 2; }
+jobs=("$@")
+for j in "${jobs[@]}"; do setup_job "$j"; prev_prog[$j]=$(progress "$j"); done
+notify ":eyes: Watching ${#jobs[@]} jobs: ${jobs[*]}"
+last_summary=$(date +%s); first_poll=1
+
+while :; do
+  now=$(date +%s); active=0
+  for j in "${jobs[@]}"; do
+    read -r s st < <(sacct -j "$j" -X -n -o State,Start | awk '{print $1, $2}')
+    [[ -z ${s:-} ]] && { active=1; continue; }        # sacct hiccup: try again next poll
+    [[ $s == PENDING || $s == RUNNING || $s == REQUEUED || $s == CONFIGURING ]] && active=1
+
+    if [[ $st != "${start[$j]}" ]]; then                # a new attempt: forget the old one
+      # Offsets mark where this attempt's log output begins. Seen starting live
+      # (not on the first poll): mark current sizes. Already running when the
+      # watcher started: read the logs from the top.
+      (( first_poll )) || mark_offsets "$j"
+      start[$j]=$st; ready_at[$j]=""; survived[$j]=""; errored[$j]=""
+    fi
+    if [[ $s != "${state[$j]}" ]]; then
+      [[ -n ${state[$j]} ]] && notify "$j ${name[$j]}: ${state[$j]} → *$s*$(p=$(show_prog "$j"); [[ -n $p ]] && echo " ($p)")"
+      case $s in
+        FAILED|TIMEOUT|OUT_OF_MEMORY|NODE_FAIL|CANCELLED*|PREEMPTED|REQUEUED) report "$j" "$s" ;;
+        PENDING)   [[ ${state[$j]} == RUNNING ]] && report "$j" PREEMPTED ;;   # requeued
+        COMPLETED) [[ -n ${SSW_PROGRESS_GLOB:-} && -n ${SSW_TOTAL:-} ]] &&
+                     (( $(progress "$j") < SSW_TOTAL )) && report "$j" "$s" ;;
+      esac
+      log "$j $s"; state[$j]=$s
+    fi
+    [[ $s == RUNNING ]] || continue
+
+    text=$(fresh "$j")
+    if [[ -z ${errored[$j]} ]] && line=$(grep -m1 -E -- "$ERROR_RE" <<<"$text"); then
+      errored[$j]=1; notify ":rotating_light: $j ${name[$j]}: $(quote "$(tidy <<<"$line")")"
+    fi
+    if [[ -n $READY_RE && -z ${ready_at[$j]} ]] && grep -qE -- "$READY_RE" <<<"$text"; then
+      ready_at[$j]=$now; notify "$j ${name[$j]}: service up"
+    fi
+    if [[ -n ${ready_at[$j]} && -z ${survived[$j]} && -z ${errored[$j]} ]] && (( now - ready_at[$j] >= SURVIVE )); then
+      survived[$j]=1; notify ":white_check_mark: $j ${name[$j]}: survived $((SURVIVE/60))+ min past startup"
+    fi
+  done
+  if (( first_poll )); then
+    for j in "${jobs[@]}"; do prev_state[$j]=${state[$j]}; done; first_poll=0
+  fi
+  (( now - last_summary >= SUMMARY )) && { summary; last_summary=$now; }
+  (( active )) || { summary force; notify ":checkered_flag: All watched jobs have left the queue. Stopping."; exit 0; }
+  sleep "$POLL"
+done

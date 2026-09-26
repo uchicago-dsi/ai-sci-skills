@@ -1,0 +1,4 @@
+interface:
+  display_name: "Slack Notifications"
+  short_description: "Ping a private Slack channel about jobs, safely"
+  default_prompt: "Use $slack-notifications to post progress and failure reports for these jobs to our private Slack channel, notify-only, with secrets filtered."

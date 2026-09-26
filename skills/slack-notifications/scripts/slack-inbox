@@ -1,0 +1,84 @@
+#!/usr/bin/env bash
+# Stream new human messages from one Slack channel, one line per message.
+#
+#   slack-inbox        # run under a watcher that turns each stdout line into an
+#                      # event for the agent (Claude Code: the Monitor tool)
+#
+# Needs the bot token (groups:history for a private channel) and the bot invited
+# to the channel. It only reads; answers go out through slack-reply.
+#
+# Each line is tagged [authorised] or [not authorised] against SLACK_AUTHORISED
+# and carries thread=TS, the ts to pass to slack-reply: a top-level message's own
+# ts, or the parent's ts for a reply inside a thread.
+#
+# Thread replies never appear in conversations.history, so each poll rescans the
+# last SLACK_INBOX_WINDOW of top-level messages. Every parent reports its
+# latest_reply, and conversations.replies is called only for threads with a
+# reply newer than the last one seen. Replies to older threads are missed.
+set -uo pipefail
+
+cfg=${SLACK_NOTIFY_CONFIG:-$HOME/.config/slack-notifications/config}
+[[ -r $cfg ]] && source "$cfg"
+: "${SLACK_CHANNEL:?set SLACK_CHANNEL (the channel ID) in $cfg}"
+: "${SLACK_AUTHORISED:?set SLACK_AUTHORISED (comma-separated member IDs) in $cfg}"
+here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+token_file=${SLACK_BOT_TOKEN_FILE:-$HOME/.slack-bot-token}
+"$here/slack-secret-check" --private "$token_file" || exit 1
+
+POLL=${SLACK_INBOX_POLL:-30}
+WINDOW=${SLACK_INBOX_WINDOW:-$((3*86400))}
+dir=${XDG_STATE_HOME:-$HOME/.local/state}; mkdir -p "$dir"
+state=$dir/slack-inbox-$SLACK_CHANNEL.ts              # newest top-level ts seen
+threads=$dir/slack-inbox-$SLACK_CHANNEL.threads.json  # {parent ts: newest reply ts seen}
+
+# Token goes to curl on stdin (-K -), never on the command line.
+api() {
+  printf 'header = "Authorization: Bearer %s"\n' "$(<"$token_file")" |
+    curl -K - -sS --max-time 15 "https://slack.com/api/$1"
+}
+
+# One output line per human message. Drop bot posts (including this tool's own)
+# and system events such as joins, which carry a subtype. Newlines become " / "
+# so one message = one event. Slack ts values are fixed-width strings, so they
+# are compared as strings: as numbers their 16 digits exceed a double's precision.
+emit() {  # $1 = where ("channel" or "in thread"), stdin = a messages array
+  jq -r --arg auth "$SLACK_AUTHORISED" --arg where "$1" '
+    sort_by(.ts)[] | select(.bot_id == null and .subtype == null)
+    | "SLACK \(if (.user as $u | $auth | split(",") | index($u)) then "[authorised]" else "[not authorised]" end) user=\(.user) ts=\(.ts) thread=\(.thread_ts // .ts) (\($where)): \(.text | gsub("\n"; " / "))"'
+}
+
+# First run: start from now, so the channel's backlog is not replayed.
+[[ -s $state ]] || date +%s.000000 > "$state"
+
+while :; do
+  top=$(<"$state")
+  since=$(( $(date +%s) - WINDOW )).000000
+  resp=$(api "conversations.history?channel=$SLACK_CHANNEL&oldest=$since&limit=200") || { sleep "$POLL"; continue; }
+  if [[ $(jq -r .ok <<<"$resp") != true ]]; then
+    # channel_not_found on a private channel usually means the bot is not a member.
+    echo "slack-inbox error: $(jq -r .error <<<"$resp")"; sleep 300; continue
+  fi
+
+  # 1. New top-level messages.
+  jq --arg top "$top" '[.messages[] | select(.ts > $top)]' <<<"$resp" | emit channel
+  jq -r --arg top "$top" '[.messages[].ts, $top] | max' <<<"$resp" > "$state"
+
+  # 2. Threads whose newest reply is newer than the one last seen. The first
+  #    time, just record where every thread stands, so old replies aren't replayed.
+  if [[ ! -s $threads ]]; then
+    jq '[.messages[] | select(.latest_reply) | {key: .ts, value: .latest_reply}] | from_entries' \
+      <<<"$resp" > "$threads"
+  else
+    seen=$(<"$threads")
+    while read -r parent last; do
+      r=$(api "conversations.replies?channel=$SLACK_CHANNEL&ts=$parent&oldest=$last&limit=200") || continue
+      [[ $(jq -r .ok <<<"$r") == true ]] || continue
+      jq --arg p "$parent" --arg last "$last" '[.messages[] | select(.ts > $last and .ts != $p)]' \
+        <<<"$r" | emit "in thread"
+      seen=$(jq --arg p "$parent" --arg v "$(jq -r '[.messages[].ts] | max' <<<"$r")" '.[$p] = $v' <<<"$seen")
+    done < <(jq -r --argjson seen "$seen" '.messages[] | select(.latest_reply)
+               | select(.latest_reply > ($seen[.ts] // .ts)) | "\(.ts) \($seen[.ts] // .ts)"' <<<"$resp")
+    printf '%s\n' "$seen" > "$threads"
+  fi
+  sleep "$POLL"
+done

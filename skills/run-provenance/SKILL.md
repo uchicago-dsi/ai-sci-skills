@@ -45,6 +45,33 @@ Before re-preparing a provenance-hashed run after an owner change, inspect its
 existing-artifact policy and either archive the prior immutable result or choose a
 new semantic run slug before resubmission.
 
+## Version Every Record That Binds A Changed Schema
+
+When an artifact's schema changes, every record that binds that artifact changes
+version with it: the pointer, the parent binding, the handoff, any `*_parent` or
+`*_publication` record whose admission reads the changed fields. A reader decides
+between "current: admit and reuse" and "superseded: keep as evidence, reuse
+nothing" from the binding's own version, not by opening the payload. If the
+binding keeps its old version while the payload moves, an old artifact claims to
+be current and fails the new check deep inside a consumer, long after the change,
+in a command that never touched that code.
+
+In one case, three constants versioned one inventory: roster, reducer, and the
+parent binding. A commit bumped the first two and missed the third. Four days
+later, an unrelated admission run failed at startup on a stored pointer to an
+inventory from before the bump.
+
+When bumping a schema:
+
+- `rg` every constant and literal carrying the old version string, and every
+  function that constructs or admits a record of that family. Bump them together
+  in one commit.
+- Register the previous binding version with whatever authenticates superseded
+  records. Every stored pointer to the old artifact then resolves as retained
+  evidence instead of raising.
+- Before calling the bump done, open one real stored record of the old version
+  through the live reader and confirm it lands in the superseded branch.
+
 ## Write A README That Says How To Remake The Output
 
 Every new output/run directory needs a launcher-written `README.md` before it is

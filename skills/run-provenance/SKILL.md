@@ -69,8 +69,16 @@ When bumping a schema:
 - Register the previous binding version with whatever authenticates superseded
   records. Every stored pointer to the old artifact then resolves as retained
   evidence instead of raising.
+- Separate producers from readers. A producer or resumer admits only the
+  current version, so it never adopts old records into a new artifact. A
+  read-only consumer that must see frozen artifacts (a duplicate screen, a
+  comparison, a replay) admits every earlier version whose layout it can read. In
+  a second case, a bump that only changed how inputs were discovered left every
+  registered exam unreadable to the screen that compares new arrivals against
+  them.
 - Before calling the bump done, open one real stored record of the old version
-  through the live reader and confirm it lands in the superseded branch.
+  through the live reader and confirm it lands in the superseded branch, or is
+  read, as intended.
 
 ## Write A README That Says How To Remake The Output
 

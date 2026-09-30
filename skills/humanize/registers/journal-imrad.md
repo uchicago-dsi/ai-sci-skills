@@ -39,6 +39,15 @@ The rule that still applies, everywhere: a sentence must not depend on the
 reader already knowing the answer. Define a term once, at first use, when it is
 specific to this work rather than to the field.
 
+An identity, invariance, or mechanism is followed, in the same or the next
+sentence, by what it does to the quantity the paper is about. "Scaling the AIF
+and dividing the parameters by the same factor leaves the fit unchanged" reads
+as "scale does not matter" until the next clause says that the parameters
+absorb the whole scale error at the same residual. A physics term or piece of
+apparatus that a sentence's point rests on gets a clause saying why it is there
+("the aorta lies far from the breast coil, so elements were added behind the
+patient"); a definition only when the venue's reader would need one.
+
 What to strike is invented vocabulary — a name this manuscript coined for its
 own convenience and then used as though the field shared it.
 

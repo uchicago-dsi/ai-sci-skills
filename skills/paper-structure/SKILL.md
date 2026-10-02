@@ -45,27 +45,6 @@ Two failure modes this catches early:
   is determined by Y, not by Z" is a claim. The second can be wrong, which is
   what makes it worth reading.
 
-## Order the argument for a first-time reader
-
-Structure is also order inside a section, and the common failure is a draft
-written in the order the work was done. Read `exemplars.md`: it records the
-papers the author holds up as models and the order they imply. In short:
-
-- **Question before machinery.** A reader meets the problem, then one concrete
-  case of it, then what is unknown, before any method or coefficient.
-- **Reason before result.** Each comparison is introduced by why it was made;
-  a number the reader cannot attach to a question is noise.
-- **Each transition earns the next step.** If connecting two analyses needs an
-  invented causal link, the second one belongs in another paper or the reserve.
-- **One job per paragraph.** It opens on its subject or question and ends
-  where the next paragraph can begin. A paragraph listing equally weighted
-  facts has no job yet.
-- **Explain a quantity before reporting it.** A study-specific measure is
-  defined, with what one value of it means, before its estimate appears.
-
-The test is a reader in the venue's field who has never seen the project:
-would they know, at every sentence, why they are being told this?
-
 ## Budget words before drafting
 
 Take the limit from the venue file, along with its definition of what counts —
@@ -234,7 +213,7 @@ is a check it could not have rigged.
 
 ## Three moments to use this skill
 
-**Before drafting.** Load the venue, read `exemplars.md`, write the spine, lay out the skeleton as
+**Before drafting.** Load the venue, write the spine, lay out the skeleton as
 empty section files, budget words, and write each section's job as a comment
 inside it. The comments become the outline you draft against and get deleted
 last.

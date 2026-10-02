@@ -48,6 +48,20 @@ apparatus that a sentence's point rests on gets a clause saying why it is there
 ("the aorta lies far from the breast coil, so elements were added behind the
 patient"); a definition only when the venue's reader would need one.
 
+Four more rules from the author's own reading of a draft, each a sentence
+that was true and still failed her:
+
+- A sentence that exists to rule something out names the thing it rules out
+  and why it would be wrong here. "All frames were kept in order" reads as a
+  truism; "no frame was dropped, averaged or resampled onto a common grid,
+  which would manufacture points never acquired" says what was avoided.
+- After a formula, say what one value of it means in the reader's units: "a
+  gain of 1.2 means the secondary read 20% more."
+- Define a coordinate by its endpoints and sign in words a reader can
+  picture, then say once what it is not.
+- Statistics jargon with a plain equivalent gets the plain word ("centred on
+  the stratum mean", not "demeaned").
+
 What to strike is invented vocabulary — a name this manuscript coined for its
 own convenience and then used as though the field shared it.
 

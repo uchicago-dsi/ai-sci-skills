@@ -60,6 +60,9 @@ everything below:
   Introduction / Methods / Results / Discussion tradition.
 - `ml-conference.md` — a machine learning conference submission with open or
   semi-open review: ICLR, NeurIPS, ICML, CVPR.
+- `specialist-talk.md` — slides, briefs and emails for collaborators who are
+  experts in the measurement (e.g. MRI physicists): the field's vocabulary
+  stays unglossed, but every experiment and every figure is explained in full.
 
 Take the register from `$ARGUMENTS` when it is named. Otherwise use `talk.md`,
 and say which register you used in the summary so a wrong guess is visible.

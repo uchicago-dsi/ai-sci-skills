@@ -109,6 +109,13 @@ hand, so it cannot drift from what it describes, and write it from the first uni
 of work rather than only from a reducer, so an interrupted run is still documented.
 A cache or export nobody can rebuild is one nobody can trust.
 
+A generated README is rewritten every time its generator runs, so anything written
+into it by hand is lost on the next re-render, silently and with exit 0. Either the
+generator writes the results itself, from the run's own summary files, or hand-added
+interpretation goes in a separate file (`NOTES.md`) that no producer ever writes.
+Never append to a generated README by hand. A figure re-render that rewrote a
+README erased its results section, and nobody noticed until the numbers were needed.
+
 Scale this to what the artifact is for. The full form is owed by anything that
 could become a parent, a reusable cache, an export, or decision-grade evidence. A
 disposable probe whose whole output is a log, and which one printed command

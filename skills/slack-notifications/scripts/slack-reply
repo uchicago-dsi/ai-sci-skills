@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# Reply inside a Slack thread, as the app's bot user.
+#
+#   slack-reply 1790394189.262229 "123456 is still pending."
+#
+# THREAD is the ts of the message being answered (slack-inbox prints it as
+# thread=...). Needs the bot token (chat:write): the webhook can only post to
+# the channel itself, not into a thread.
+set -euo pipefail
+
+here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+cfg=${SLACK_NOTIFY_CONFIG:-$HOME/.config/slack-notifications/config}
+[[ -r $cfg ]] && source "$cfg"
+: "${SLACK_CHANNEL:?set SLACK_CHANNEL (the channel ID, e.g. C0123ABCDEF) in $cfg}"
+token_file=${SLACK_BOT_TOKEN_FILE:-$HOME/.slack-bot-token}
+
+(( $# >= 2 )) || { echo "usage: slack-reply THREAD_TS MESSAGE..." >&2; exit 2; }
+thread=$1; shift; msg="$*"
+[[ $thread =~ ^[0-9]{10}\.[0-9]{6}$ ]] || { echo "slack-reply: '$thread' is not a Slack ts" >&2; exit 2; }
+"$here/slack-secret-check" --private "$token_file" || exit 1
+
+printf '%s' "$msg" | "$here/slack-secret-check" || exit $?    # 3 = blocked
+[[ -n ${SLACK_NOTIFY_DRYRUN:-} ]] && { echo "slack-reply: would reply in $thread: $msg"; exit 0; }
+
+payload=$(jq -n --arg c "$SLACK_CHANNEL" --arg t "$thread" --arg text "$msg" \
+               '{channel: $c, thread_ts: $t, text: $text}')
+
+# Token on stdin (-K -), never on the command line. The Web API answers HTTP 200
+# even on failure and puts the verdict in "ok", so check that, not the status.
+resp=$(printf 'header = "Authorization: Bearer %s"\n' "$(<"$token_file")" |
+       curl -K - -sS --max-time 10 -H 'Content-Type: application/json; charset=utf-8' \
+            --data "$payload" https://slack.com/api/chat.postMessage)
+[[ $(jq -r .ok <<<"$resp") == true ]] || { echo "slack-reply: Slack refused: $(jq -r .error <<<"$resp")" >&2; exit 1; }

@@ -65,6 +65,18 @@ When proposing an experiment, report:
 - State the baseline disposition and exact falsification scope before pivoting.
 
 
+## Measure On Every Eligible Unit
+
+When compute is not the binding constraint, run each analysis, comparison or
+diagnostic on every eligible unit (every exam, every participant), not on a
+sample. A sample adds sampling noise to every number and invites the question of
+whether the sample was representative; a seeded 60-exam draw once stood in for a
+661-exam cohort whose full run cost about half a GPU-hour. "Eligible" still
+excludes sealed held-out units and anything the analysis cannot validly read.
+Subsets remain right for a smoke that proves the path reaches the real kernel,
+for a wall-time projection, and for resampling-based uncertainty. If a full run
+would genuinely cost too much, say what it costs and let the owner choose.
+
 ## Run It Only When A Result Would Change The Next Action
 
 - Run a preliminary experiment only when its possible results can change the next

@@ -102,6 +102,8 @@ def findings(binary, cwd, paths):
     result = run([str(binary), "check", "--output-format=concise"] + existing, cwd=cwd)
     if not result:
         return 0, ""
+    if result[0] == 0:
+        return 0, ""
     lines = [line for line in result[1].splitlines()
              if line.strip() and not line.startswith("Found ")
              and "fixable with" not in line]

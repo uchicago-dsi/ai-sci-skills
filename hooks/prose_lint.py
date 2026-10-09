@@ -33,6 +33,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from british_spelling import find as british_spellings  # noqa: E402
 from hookio import allow, block_stop, payload  # noqa: E402
 
 # Each entry: a compiled pattern and what to do instead. Patterns are chosen
@@ -55,10 +56,18 @@ RULES = [
      "drop the adverb"),
     # Contrastive padding. Restricted to the forms that are almost never
     # load-bearing: the inferior alternative is named right after the verb.
+    # `\w*` and not `\w+` on every stem: the bare form is the common one, and
+    # requiring a suffix let "rather than guess" through while catching
+    # "rather than guessed".
     (r"\b(?:measured|verified|checked|tested|computed|derived|fixed)\s+"
-     r"rather than\s+(?:assum\w+|guess\w+|estimat\w+|inferr\w+|speculat\w+)",
+     r"rather than\s+(?:assum\w*|guess\w*|estimat\w*|inferr\w*|speculat\w*)",
      "drop the 'rather than' clause"),
-    (r"\brather than (?:silently )?(?:omitt\w+|ignor\w+|assum\w+|guess\w+)\b",
+    # The alternative nobody proposed, named after "rather than". Kept to verbs
+    # whose object is the agent's own shortcut: nobody ever asked for the guess,
+    # the assumption, or the unchecked version, so naming it is padding.
+    (r"\brather than (?:silently |simply |just |merely )?"
+     r"(?:omitt\w*|ignor\w*|assum\w*|guess\w*|estimat\w*|inferr\w*|speculat\w*"
+     r"|trust\w*|hop\w*|estimating|reconstruct\w*)\b",
      "drop the 'rather than' clause"),
     (r"\bnot (?:a guess|an assumption|speculation)\b", "drop it"),
     (r"\ba (?:measurement|finding|result) rather than\b", "drop the contrast"),
@@ -120,6 +129,8 @@ def main():
         for match in pattern.finditer(text):
             hits.append((match.group(0).strip(), fix))
             break  # one report per rule is enough to prompt a pass
+    for word, american in british_spellings(text):
+        hits.append((word, "American spelling: " + american))
     if not hits:
         allow()
 
@@ -130,7 +141,7 @@ def main():
     report.append("These are the ones with near-zero false positives. While "
                   "rewriting, also check the judgement calls the linter "
                   "cannot: contrasts naming an alternative nobody proposed, "
-                  "and sentences whose subject is your own candour or "
+                  "and sentences whose subject is your own candor or "
                   "thoroughness.")
     block_stop("\n".join(report))
 

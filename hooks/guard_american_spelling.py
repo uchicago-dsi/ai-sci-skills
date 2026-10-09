@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Refuse a commit that adds British spellings to text a reader will see.
+"""Refuse a commit that adds British spellings, or lab-only words in audience writing.
 
 Anna writes American English, and British forms kept coming back into her
 slides, notes and figure labels after being fixed. Most edits reach a file
@@ -15,6 +15,11 @@ and generated READMEs come from, and identifiers are literals that renaming
 would break. The word list and the identifier exemptions live in
 `british_spelling.py`.
 
+In a repository of decks or manuscripts (see `audience_jargon.py`), prose
+lines are also checked for words that only mean something inside the
+pipeline: "production", "mid-label", generation codes, run names. Speaker
+notes are exempt there.
+
 When a hit is a quotation, a proper name or a third party's identifier that
 must stay as written, put it in backticks, which are exempt.
 """
@@ -27,6 +32,7 @@ import tokenize
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import audience_jargon  # noqa: E402
 from british_spelling import find, strip_code  # noqa: E402
 from guard_ruff_before_commit import commits, run  # noqa: E402
 from hookio import allow, command_text, deny_tool, is_shell, payload  # noqa: E402
@@ -96,7 +102,8 @@ def main():
         allow()
     toplevel = result[1].strip()
 
-    report = []
+    report, jargon = [], []
+    audience = audience_jargon.is_audience_repository(toplevel)
     for path, lines in sorted(added_lines(toplevel).items()):
         lower = path.lower()
         if not (lower.endswith(PROSE) or lower.endswith(".py")):
@@ -113,17 +120,30 @@ def main():
         if hits:
             report.append("  %s: %s" % (path, ", ".join(
                 "%s -> %s" % (word, american) for word, american in hits[:8])))
-    if not report:
+        if audience and lower.endswith(PROSE):
+            rows = source.split("\n")
+            shown = sorted(lines - audience_jargon.notes_lines(source))
+            prose = "\n".join(rows[n - 1] for n in shown if n - 1 < len(rows))
+            for word, fix in audience_jargon.find(strip_code(prose))[:8]:
+                jargon.append("  %s: %s -> %s" % (path, word, fix))
+    if not report and not jargon:
         allow()
 
-    deny_tool(
-        "Refused this commit: it adds British spellings to text a reader will see.\n\n"
-        "%s\n\n"
-        "Use the American form in prose, comments, docstrings and string "
-        "literals (plot labels, captions, generated READMEs), then re-stage "
-        "and commit. Identifiers, paths and run names are already exempt; a "
-        "quotation or third-party name that must stay as written goes in "
-        "backticks." % "\n".join(report[:20]))
+    parts = []
+    if report:
+        parts.append(
+            "British spellings in text a reader will see:\n%s\n"
+            "Use the American form in prose, comments, docstrings and string "
+            "literals (plot labels, captions, generated READMEs). Identifiers, "
+            "paths and run names are already exempt." % "\n".join(report[:20]))
+    if jargon:
+        parts.append(
+            "Project-private words in writing for an outside audience:\n%s\n"
+            "Say what the thing is in the reader's terms. Speaker notes are "
+            "exempt." % "\n".join(jargon[:20]))
+    deny_tool("Refused this commit.\n\n" + "\n\n".join(parts) +
+              "\n\nA quotation or third-party name that must stay as written "
+              "goes in backticks. Fix, re-stage and commit again.")
 
 
 if __name__ == "__main__":

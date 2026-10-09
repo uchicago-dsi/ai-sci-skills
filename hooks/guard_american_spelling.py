@@ -13,7 +13,7 @@ Quarto, LaTeX, plain text) are read whole. In Python, only comments and
 string literals that contain a space are read: that is where docstrings, plot labels, captions
 and generated READMEs come from, and identifiers are literals that renaming
 would break. The word list and the identifier exemptions live in
-`british_spelling.py`, shared with the reply linter.
+`british_spelling.py`.
 
 When a hit is a quotation, a proper name or a third party's identifier that
 must stay as written, put it in backticks, which are exempt.

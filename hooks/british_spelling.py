@@ -3,8 +3,9 @@
 Anna writes American English. British forms come back on their own: from
 quoted sources, from earlier drafts, from figure labels copied between
 scripts, and from agents whose training leans British. Fixing them by hand
-each time has not held, so the two hooks that see prose -- the reply linter
-and the commit guard -- share this list and refuse on it.
+each time has not held, so the commit guard refuses on this list. Chat replies
+are not checked: British spelling there costs nothing, and a refused reply
+costs a full rewrite.
 
 The list is restricted to forms that are almost never correct in American
 English. Words both spellings share ("dialogue", "judgement"), and stems

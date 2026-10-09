@@ -33,7 +33,6 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from british_spelling import find as british_spellings  # noqa: E402
 from hookio import allow, block_stop, payload  # noqa: E402
 
 # Each entry: a compiled pattern and what to do instead. Patterns are chosen
@@ -129,8 +128,6 @@ def main():
         for match in pattern.finditer(text):
             hits.append((match.group(0).strip(), fix))
             break  # one report per rule is enough to prompt a pass
-    for word, american in british_spellings(text):
-        hits.append((word, "American spelling: " + american))
     if not hits:
         allow()
 

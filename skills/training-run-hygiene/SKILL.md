@@ -1,6 +1,6 @@
 ---
 name: training-run-hygiene
-description: "Make a training run's health visible: persist a scale-free loss history from the first update, establish that the model can learn on a small subset before spending on a big run, and run outcome-blind longitudinal QC on a fixed roster. Use when launching, resuming, monitoring, or reviewing any scientific training run."
+description: "Make a training run's health visible: persist a scale-free loss history from the first update, verify basic mechanics, and monitor learning and outcome-blind longitudinal QC on the full eligible cohort. Use when launching, resuming, monitoring, or reviewing any scientific training run."
 ---
 
 # Training Run Hygiene
@@ -41,29 +41,27 @@ If a frozen live run lacks a true loss history, add only a versioned checkpoint
 sidecar and label its metrics as checkpoint QC rather than optimizer-loss curves.
 Never reconstruct or imply losses that were never recorded.
 
-## Establish Small-Subset Learning First
+## Verify Mechanics, Then Train On The Full Eligible Dataset
 
-Before the first expensive training run of a new model, renderer, objective, or
-training regime, establish small-subset learning with matched no-skill and
-non-learned fitting references on the same element set.
+Follow `experiment-design`'s full-dataset default. Reuse existing mechanical
+evidence. For an unverified training path, use only a brief real-input check of
+forward/backward execution, finite gradients, geometry, memory, checkpoint writing
+and required diagnostics. Combine checks where possible; repeat only for a named
+repair or unverified path. Do not require small-subset memorization, a favorable
+score, a sweep or a plateau before full-cohort training.
 
-- Reuse applicable existing evidence; otherwise run the smallest informative
-  memorization check.
-- If learning fails, vary knobs tied to a specific optimization or capacity
-  hypothesis rather than treating one setting as a verdict on the whole method.
-- Do not require a sweep or a plateau when neither would change the decision.
-- Report scale-free errors and behavior beside the references, distinguish an
-  optimization failure from an inconclusive utility comparison, and state the next
-  action.
-- Numerical promotion thresholds are a scientific gate and need explicit approval.
-
-This applies to unverified changes, not to routine resumes or established reruns.
+Monitor learning against matched no-skill and non-learned references during the
+full eligible training run. Small-run losses or images establish no scientific
+benefit, method ranking, generalization or lack of potential. Mechanical failures
+justify repair; scientific comparisons use the full eligible cohort with preserved
+splits. Numerical promotion thresholds still require explicit approval.
 
 ## Run Predeclared, Outcome-Blind Longitudinal QC
 
 Every scientific training run must also have predeclared, outcome-blind
-longitudinal QC from initialization through training, on a fixed representative
-roster spanning the major source strata. Run it at the same declared checkpoint
+longitudinal QC from initialization through training, with numerical diagnostics
+on the full eligible roster. A fixed selection spanning major source strata may
+provide visual illustrations alongside those diagnostics. Run QC at the declared checkpoint
 cadence, preserve physical aspect ratio and the full input extent, and include
 task-appropriate fidelity and failure-mode diagnostics.
 

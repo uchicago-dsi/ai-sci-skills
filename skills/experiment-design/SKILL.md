@@ -9,7 +9,8 @@ description: "Design the smallest useful experiment matrix that separates import
 
 - The purpose of an experiment is to change a decision, not to accumulate runs.
 - Start from the decision that needs to be made.
-- Work backward to the smallest experiment that can separate the live hypotheses.
+- Work backward to the fewest experimental arms that separate the live hypotheses;
+  use the full eligible dataset for each arm.
 
 ## Use This Output Contract
 
@@ -33,7 +34,8 @@ When proposing an experiment, report:
 - Freeze everything not under test.
 - Use the nearest baseline, not a weak or outdated one.
 - If the baseline is unfair, stale, or confounded, fix that before treating the experiment as decision-worthy.
-- Prefer cheap discriminative checks before expensive cluster-scale runs.
+- Reuse existing mechanics evidence; perform a minimal real-input check only when
+  an unverified execution path needs it, then run the full eligible cohort.
 - Keep the best valid baseline as an explicit arm or immutable comparison until
   a prospectively defined successor beats it on the same decision readouts.
 - For every candidate, identify the exact delta from the baseline and what
@@ -55,7 +57,8 @@ When proposing an experiment, report:
 - Do not broaden the matrix when a smaller check is still ambiguous.
 - Do not run a sweep just because parameters are available.
 - Do not collect outputs you will not actually inspect.
-- Do not start a large run if a toy, slice, overfit, dry-run, or subset check would reveal the same failure mode.
+- A basic mechanics check may catch invalid shapes, gradients, geometry, memory
+  use or outputs before launch. Do not turn it into a small-cohort scientific study.
 
 ## End With A Clear Recommendation
 
@@ -67,37 +70,41 @@ When proposing an experiment, report:
 
 ## Measure On Every Eligible Unit
 
-When compute is not the binding constraint, run each analysis, comparison or
-diagnostic on every eligible unit (every exam, every participant), not on a
-sample. A sample adds sampling noise to every number and invites the question of
-whether the sample was representative; a seeded 60-exam draw once stood in for a
-661-exam cohort whose full run cost about half a GPU-hour. "Eligible" still
-excludes sealed held-out units and anything the analysis cannot validly read.
-Subsets remain right for a smoke that proves the path reaches the real kernel,
-for a wall-time projection, and for resampling-based uncertainty. If a full run
-would genuinely cost too much, say what it costs and let the owner choose.
+Default to the full eligible dataset for training, analyses, comparisons and
+scientific diagnostics. A smaller experiment matrix means fewer arms, not fewer
+participants. Do not substitute a subset for convenience, queue delay, or an
+estimate that a full run will take too long. If a concrete resource constraint
+prevents the full run, explain it and ask Anna before narrowing scientific scope.
+
+Use at most a minimal basic mechanics check for an unverified path, combining
+real-kernel execution, shape/geometry, gradients, memory and timing checks where
+possible. Reuse that evidence; repeat only to verify a specific repair or newly
+unverified path. Then go directly to the full eligible dataset. Do not build a
+ladder of one-case, few-case and intermediate-cohort runs.
+
+Small runs support mechanical observations only. Do not use their scores, learning
+curves or visual examples to rank methods, claim benefit or failure, reject a
+scientific premise, choose a scientific direction, or infer generalization. State
+the mechanical fact and what remains untested; draw scientific conclusions from
+the full eligible comparison. A basic failure may require an implementation repair,
+not a verdict on the method.
+
+"Eligible" respects participant-exclusive folds, authorized data access and sealed
+confirmation sets: full training means every training-eligible participant, not
+training on validation or confirmation data. Resampling-based uncertainty and
+selected illustrations may accompany a full-cohort analysis; they do not replace it.
 
 ## Run It Only When A Result Would Change The Next Action
 
 - Run a preliminary experiment only when its possible results can change the next
   action. State the question, what different outcomes would change, and why the
   existing evidence is insufficient.
-- There is no mandatory cohort-size ladder. Skip an intermediate-scale run when it
-  would not change the next experiment or resolve a material implementation or
-  scientific uncertainty. Before running one, name the unresolved question and which
-  result would change the next action; if either plausible outcome still calls for
-  full-scale learning, go straight there from a real small-subset learning check and
-  a representative input-shape and memory check.
-- Memorization tests diagnose optimization and representation limits. They do not
-  establish the ranking on unseen units, and they do not exclude benefits that
-  require scale to appear. Do not demand a small-cohort winner before a larger
-  comparison intended to answer those questions.
-- Treat a small run of a data-hungry method as a mechanism check only, never as
-  evidence about whether it works at scale. A small pilot may reject such an
-  implementation only when it exposes a scale-independent mechanics defect directly,
-  such as invalid gradients or pathological constraint saturation on clean inputs.
-  Before rejecting the family, train the strongest mechanically credible formulation
-  on the full currently eligible cohort, and record the eligible denominator and
+- Scientific uncertainty is resolved on the full eligible cohort. A subset check
+  is justified only by a specific unverified mechanical behavior, not by a desire
+  to see whether a scientific comparison looks promising before running it fully.
+- Do not demand a small-cohort winner before full-cohort comparison. Before
+  rejecting a method family, evaluate its strongest mechanically credible
+  formulation on the full currently eligible cohort; record the denominator and
   every exclusion.
 
 ## Do Not Train To Satisfy A Ritual
@@ -118,9 +125,10 @@ Do real scoped work once the code and the data contract are understood. Use toy,
 synthetic, or dry-run checks only where they test a concrete failure mode more
 cheaply than the real path.
 
-Do not expand a representative smoke into an array or cohort run when a primary
-predeclared gate fails, or when the smoke was scientifically uninformative. Repair
-or redesign first: technical job success is not a passing scientific smoke.
+Repair a failed mechanics check before expanding that execution path. A mechanically
+valid small check need not show scientific benefit before full-cohort launch;
+establishing that benefit is the full experiment's job. Preserve any explicit
+user-approved launch gate rather than inventing one from small-run scores.
 
 ## References
 

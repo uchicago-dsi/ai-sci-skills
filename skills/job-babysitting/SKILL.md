@@ -129,6 +129,28 @@ runs shifts byte offsets under a live shell. Give the channel a durable ledger a
 prove its query against a real in-scope positive at startup, saying so plainly when
 the window holds none.
 
+## Make A Long Run Fail Early And Fail Once
+
+A run that can refuse individual units (an exam, a file, a receipt) and stops the
+whole batch at the first refusal turns every bad unit into a full relaunch. When the
+check sits many hours in, each relaunch costs those hours again. One cohort intake
+failed twice this way at hours 22 and 23: once on a delivery it was comparing against
+itself, then on a single non-image file in an accepted series. Each failure was found,
+fixed and relaunched before the next one could be seen.
+
+- Order the checks by cost. A check that needs only metadata the run already has, such
+  as receipts, ledgers, manifests or header tables, runs before the step that hashes or
+  decodes the data, so a bad unit fails in minutes.
+- A check that refuses one unit for its own reasons collects every refusal in one
+  pass and stops the run at the end of that pass, reporting all of them. A refusal that
+  means the run's own inputs or code are corrupt still stops at once.
+- Before relaunching after one such failure, look for the others. Run the failing
+  check over every unit in a short diagnostic job, and fix the whole class instead of
+  the one instance.
+- Know before launch whether a relaunch can reuse finished work. If the intermediates
+  are keyed to the code version, every fix costs the whole run, and that cost belongs
+  in the decision to launch an untried path at cohort scale.
+
 ## A Completed Run Is Not A Healthy One
 
 Monitor learning, not only liveness. Terminal-state sweeps and gates asserting that

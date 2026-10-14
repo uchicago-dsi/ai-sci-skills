@@ -27,6 +27,7 @@ Each skill is intentionally compact. The shared versions encode decision rules a
 | `agentcomm` | Let agents coordinate with each other through a shared mailbox |
 | `quota-saving-mode` | Cut the model requests spent on polling, waiting, and status chatter |
 | `humanize` | Edit prose so it sounds like the author and reads plainly |
+| `slack-notifications` | Post job progress and failure reports to a private Slack channel, and answer questions there, with least-privilege credentials and a code-enforced secret filter |
 
 ### Agents talking to each other
 

@@ -73,6 +73,41 @@ description: "Inspect queue state, submit or cancel jobs, debug sbatch and submi
 - Prefer exact job IDs, exact run directories, and explicit timestamps in status updates.
 - Look for repo-native monitoring utilities before rebuilding ad hoc parsing.
 
+## Bound Scheduler Load And Batch Small Work
+
+These are agent operating defaults, not claims about a cluster's configured
+limits. Honor a stricter site or project limit.
+
+- Per lane, cap **running tasks at 512**, counting standalone jobs and individual
+  array elements across all workers in the lane. This is a concurrency ceiling,
+  not a cap on cohort size or pending tasks. Use array concurrency limits and
+  divide the allowance among concurrent arrays; giving work to another agent
+  does not create another allowance. Managers sharing a scheduler account must
+  coordinate their combined load rather than each treating 512 as a target.
+  Record any necessary higher limit with its scope and reason before launching.
+  Do not cancel useful work just to get below the limit after adopting this policy.
+- Space new `sbatch` submissions by at least **10 seconds across cooperating
+  agents sharing the scheduler account**. Use one submission owner per lane and
+  coordinate a shared submission cadence across managers. Prefer a small number
+  of array submissions over a loop issuing one submission for every case.
+- Pack small cases into restartable shards targeting roughly **10–30 minutes of
+  useful work**, sized from representative throughput, rather than submitting a
+  separate batch job for every case, check, or tiny processing stage. Keep per-case
+  completion records so a preemption repeats only unfinished work. Batch only
+  compatible resource requests; do not combine unlike GPU or memory requirements
+  merely to reduce job count.
+- An array reduces submission calls but each element still creates scheduler
+  work. Use larger case batches within array elements, bounded array concurrency,
+  and bounded submission waves rather than creating tens of thousands of tiny
+  tasks at once.
+  Reuse a compatible existing allocation through a small number of long-lived
+  workers when authorized; do not replace an `sbatch` storm with an `srun` storm.
+- Share queue snapshots and use one watcher per job. Query all relevant IDs in
+  one call, normally no more often than every **60 seconds** while unchanged.
+  On controller timeouts or rate-limit/backoff responses, slow down and reconcile
+  the original submission handle before retrying. Never duplicate a submission
+  merely because its RPC is taking a long time.
+
 ## Submit Or Resubmit Jobs
 
 - Prefer repo-native submission entrypoints first, especially checked-in `submit.py` or other `submitit` launchers that encode resource defaults, output layout, validation, and run naming.
@@ -213,7 +248,8 @@ it, not the only place it applies.
 
 ## Treat Backlog As Normal
 
-Useful jobs may sit pending when queue policy says to overfill. Treat
+Useful jobs may sit pending while running concurrency stays within the limit
+above; pending work does not consume that running-task allowance. Treat
 `PD(QOSMaxJobsPerUserLimit)`, `PD(Resources)`, and similar backlog as normal
 queueing unless the logs or your instructions say otherwise.
 

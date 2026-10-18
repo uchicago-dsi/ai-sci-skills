@@ -148,7 +148,9 @@ why the hook above is hand-written and reviewed rather than generated.
   reporting work done.
 - Silence is not an empty inbox. Verify your identity resolves before
   concluding nobody has written to you.
-- One watcher per job, not one per agent that cares.
+- One watcher and one responsible manager per event. Use the owner-bound
+  `await-notify` route in `quota-saving-mode`; other managers request a summary
+  from the owner rather than subscribing to routine completions.
 
 Give every Claude worker its own `AGENTCOMM_AGENT` value when launching or
 resuming through the Claude bridge. Do not inherit the manager's name. The

@@ -85,9 +85,10 @@ and `await-event` ship in this repository's `bin/` for that case.
 and the waiting happens in a detached process:
 
 ```
-await-notify --to <tmux-target> [options] -- <await-event args...>
+await-notify --to <stable-pane-id> --mailbox <owner> [options] -- <await-event args...>
   --to TARGET       tmux session or session:window.pane to wake (required)
-  --mailbox AGENT   also send the full detail via `agentcomm send AGENT`
+  --mailbox AGENT   required responsible manager, matching the bound pane owner
+  --bind-owner NAME bind a verified pane to its manager (no event arguments)
   --label TEXT      short human name for the thing being watched
   --timeout S       give up after S seconds total (default 86400)
   --interval S      seconds between internal polls (default 30)
@@ -95,11 +96,25 @@ await-notify --to <tmux-target> [options] -- <await-event args...>
 
 ```bash
 sbatch scripts/slurm_fan_fit.sh            # -> Submitted batch job 15233526
-await-notify --to <agent-session> --mailbox <agent-name> --label "fan fit" -- slurm 15233526
+await-notify --to %9 --mailbox mao --label "fan fit" -- slurm 15233526
 # {"event":"watch_registered","watch_id":"...","ledger":"..."}
 # then go do something else; the wake-up arrives as:
 # EVENT (fan fit): {"event":"slurm_terminal","state":"COMPLETED","exit_code":"0:0",...}
 ```
+
+One responsible manager receives each event. Other managers ask that owner for
+results; they do not subscribe to the same completion. Before the first watch,
+verify the owner's actual pane and bind it with
+`await-notify --to %9 --bind-owner mao`. Do not infer ownership from a bare
+`tmux display-message` or inherited `TMUX_PANE`: tool hosts can inherit another
+agent's terminal context. Resolve the agent's session/process or inspect an
+explicitly targeted pane. Require `--mailbox` to match that binding. The helper
+pins the stable pane and process, checks ownership again before delivery, and
+locks each event across managers to reject duplicate live registrations.
+Existing detached watchers retain their producing code; their owner must migrate
+confirmed stale routes without cancelling the underlying work. Routine completion
+notices go only to that owner; escalate to another manager only when an action or
+decision is required.
 
 It refuses to register against a tmux session that does not exist, because a
 watcher whose wake-up can never land is indistinguishable from a job that never

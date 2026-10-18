@@ -10,18 +10,18 @@
 # takes it immediately, a busy one queues it to the next turn boundary.
 #
 # Usage:
-#   await-notify --to <tmux-target> [options] -- <await-event args...>
+#   await-notify --to <tmux-target> --mailbox <owner> [options] -- <await-event args...>
 #
-#   --to TARGET       tmux session or session:window.pane to wake (required)
-#   --mailbox AGENT   also send the full detail via `agentcomm send AGENT`
+#   --to TARGET       verified stable tmux pane ID (for example %9)
+#   --mailbox AGENT   responsible manager; must match the bound pane owner
 #   --label TEXT      short human name for the thing being watched
 #   --timeout S       give up after S seconds total (default 86400)
 #   --interval S      seconds between internal polls (default 30)
 #
 # Everything after `--` is passed to await-event, so any event kind it supports
 # works here:
-#   await-notify --to <agent-session> --label "fan fit" -- slurm 15233526
-#   await-notify --to data/spock  --label "export"  -- file /path/to/DONE
+#   await-notify --to %9 --mailbox mao --label "fan fit" -- slurm 15233526
+#   await-notify --to %16 --mailbox spock --label "export"  -- file /path/to/DONE
 #
 # Prints one JSON registration receipt and returns immediately. The watcher runs
 # detached. Its ledger is $LEDGER below: a standing notification channel needs a
@@ -35,29 +35,32 @@ LEDGER=$STATE_DIR/ledger.jsonl
 
 usage() {
     cat >&2 <<'USAGE'
-await-notify --to <tmux-target> [options] -- <await-event args...>
+await-notify --to <tmux-target> --mailbox <owner> [options] -- <await-event args...>
 
-  --to TARGET       tmux session or session:window.pane to wake (required)
-  --mailbox AGENT   also send the full detail via `agentcomm send AGENT`
+  --to TARGET       verified stable tmux pane ID (for example %9)
+  --mailbox AGENT   responsible manager; must match the bound pane owner
+  --bind-owner NAME bind a verified pane to its manager (no event arguments)
   --label TEXT      short human name for the thing being watched
   --timeout S       give up after S seconds total (default 86400)
   --interval S      seconds between internal polls (default 30)
 
 Everything after `--` goes to await-event:
-  await-notify --to <agent-session> --label "fan fit" -- slurm 15233526
-  await-notify --to data/spock  --label "export"  -- file /path/to/DONE
-  await-notify --to <agent-session> --label "oom"     -- log train.log 'CUDA out of memory'
+  await-notify --to %9 --mailbox mao --label "fan fit" -- slurm 15233526
+  await-notify --to %16 --mailbox spock --label "export"  -- file /path/to/DONE
+  await-notify --to %9 --mailbox mao --label "oom"     -- log train.log 'CUDA out of memory'
 
+Bind once: await-notify --to %9 --bind-owner mao
 Returns immediately with a JSON receipt; the watcher runs detached.
 USAGE
     exit 2
 }
 
-TARGET= MAILBOX= LABEL= TIMEOUT=86400 INTERVAL=30
+TARGET= MAILBOX= LABEL= BIND_OWNER= TIMEOUT=86400 INTERVAL=30
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --to)       TARGET=${2:?}; shift 2 ;;
         --mailbox)  MAILBOX=${2:?}; shift 2 ;;
+        --bind-owner) BIND_OWNER=${2:?}; shift 2 ;;
         --label)    LABEL=${2:?}; shift 2 ;;
         --timeout)  TIMEOUT=${2:?}; shift 2 ;;
         --interval) INTERVAL=${2:?}; shift 2 ;;
@@ -67,18 +70,38 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 [[ -n $TARGET ]] || { echo "$PROG: --to is required" >&2; usage; }
-[[ $# -ge 1 ]]   || { echo "$PROG: nothing to watch (expected args after --)" >&2; usage; }
-
-command -v await-event >/dev/null 2>&1 || {
-    echo "$PROG: await-event not found on PATH" >&2; exit 3; }
-
-# Fail now, loudly, rather than detaching a watcher whose wake-up can never
-# land. A watcher pointed at a dead session is indistinguishable from a job
-# that never finished.
-tmux has-session -t "$TARGET" 2>/dev/null || {
-    echo "$PROG: no tmux session '$TARGET'" >&2; exit 4; }
-
-mkdir -p "$STATE_DIR"
+# Resolve mutable window indices once; delivery retains this pane and process.
+TARGET=$(tmux display-message -p -t "$TARGET" '#{pane_id}') || exit 4
+[[ $TARGET == %* ]] || { echo "$PROG: target does not resolve to a pane" >&2; exit 4; }
+OWNER_OPTION=@await_notify_owner_${TARGET#%}
+PANE_PID=$(tmux display-message -p -t "$TARGET" '#{pane_pid}')
+OWNER=$(tmux show-options -g -v "$OWNER_OPTION" 2>/dev/null || true)
+if [[ -n $BIND_OWNER ]]; then
+    [[ $# -eq 0 && -z $MAILBOX ]] || { echo "$PROG: binding is separate from watching" >&2; exit 2; }
+    [[ -z $OWNER || $OWNER == "$BIND_OWNER" ]] || {
+        echo "$PROG: pane $TARGET already belongs to $OWNER" >&2; exit 4; }
+    tmux set-option -g "$OWNER_OPTION" "$BIND_OWNER" || exit 4
+    printf 'Bound %s to %s (pane process %s)\n' "$BIND_OWNER" "$TARGET" "$PANE_PID"
+    exit 0
+fi
+[[ $# -ge 1 ]] || { echo "$PROG: nothing to watch" >&2; exit 2; }
+[[ -n $MAILBOX && $OWNER == "$MAILBOX" ]] || {
+    echo "$PROG: --mailbox must match the verified owner of $TARGET (owner: ${OWNER:-unbound}); bind the manager's verified pane with --bind-owner NAME first" >&2
+    exit 4
+}
+command -v await-event >/dev/null 2>&1 || { echo "$PROG: await-event missing" >&2; exit 3; }
+command -v flock >/dev/null 2>&1 || { echo "$PROG: flock missing" >&2; exit 3; }
+mkdir -p "$STATE_DIR/locks"
+# The lock belongs to the event, independent of manager, label or target.
+EVENT_KEYS=$(python3 -c 'import hashlib,json,os,sys
+args=sys.argv[1:]
+if args[0] in ("file", "log") and len(args)>1: args[1]=os.path.realpath(args[1])
+events=[["slurm",job] for job in sorted(set(args[1:]))] if args[0]=="slurm" else [args]
+for event in events: print(hashlib.sha256(json.dumps(event).encode()).hexdigest())' "$@") || exit 3
+while IFS= read -r EVENT_KEY; do
+    exec {WATCH_LOCK}>"$STATE_DIR/locks/$EVENT_KEY.lock"
+    flock -n "$WATCH_LOCK" || { echo "$PROG: this event already has an active watcher; ask its owner for a summary" >&2; exit 6; }
+done <<< "$EVENT_KEYS"
 WATCH_ID=$(date +%Y%m%dT%H%M%S)-$$-$RANDOM
 LOG=$STATE_DIR/$WATCH_ID.log
 [[ -n $LABEL ]] || LABEL="$*"
@@ -87,8 +110,8 @@ jstr() { python3 -c 'import json,sys; print(json.dumps(sys.argv[1]))' "$1" 2>/de
          || printf '"%s"' "${1//\"/\\\"}"; }
 
 record() {  # append one ledger line; the ledger is the only durable evidence
-    printf '{"ts":%s,"watch_id":%s,"target":%s,"label":%s,"phase":%s,"detail":%s}\n' \
-        "$(date +%s)" "$(jstr "$WATCH_ID")" "$(jstr "$TARGET")" "$(jstr "$LABEL")" \
+    printf '{"ts":%s,"watch_id":%s,"target":%s,"owner":%s,"label":%s,"phase":%s,"detail":%s}\n' \
+        "$(date +%s)" "$(jstr "$WATCH_ID")" "$(jstr "$TARGET")" "$(jstr "$MAILBOX")" "$(jstr "$LABEL")" \
         "$(jstr "$1")" "$(jstr "${2:-}")" >> "$LEDGER"
 }
 
@@ -109,13 +132,14 @@ watcher() {
     record fired "$out"
 
     # Detail goes to the mailbox; the pane gets a short notice pointing at it.
-    if [[ -n $MAILBOX ]] && command -v agentcomm >/dev/null 2>&1; then
+    if command -v agentcomm >/dev/null 2>&1; then
         agentcomm send "$MAILBOX" "watch fired: $LABEL -- $out" --subject status \
             >/dev/null 2>&1 || record mailbox_failed "$MAILBOX"
     fi
 
-    if ! tmux has-session -t "$TARGET" 2>/dev/null; then
-        record undeliverable "session gone: $TARGET"; return 5
+    if [[ $(tmux display-message -p -t "$TARGET" '#{pane_pid}' 2>/dev/null) != "$PANE_PID" ]] ||
+       [[ $(tmux show-options -g -v "$OWNER_OPTION" 2>/dev/null) != "$MAILBOX" ]]; then
+        record undeliverable "owner or pane process changed: $TARGET"; return 5
     fi
     # Literal text first, then Enter as its own key after a beat. A single
     # send-keys with the newline appended lands in the composer without being
@@ -131,9 +155,9 @@ setsid bash -c "$(declare -f jstr record watcher); \
     PROG=$(printf %q "$PROG") STATE_DIR=$(printf %q "$STATE_DIR") \
     LEDGER=$(printf %q "$LEDGER") WATCH_ID=$(printf %q "$WATCH_ID") \
     LOG=$(printf %q "$LOG") TARGET=$(printf %q "$TARGET") \
-    MAILBOX=$(printf %q "$MAILBOX") LABEL=$(printf %q "$LABEL") \
+    MAILBOX=$(printf %q "$MAILBOX") PANE_PID=$(printf %q "$PANE_PID") OWNER_OPTION=$(printf %q "$OWNER_OPTION") LABEL=$(printf %q "$LABEL") \
     TIMEOUT=$(printf %q "$TIMEOUT") INTERVAL=$(printf %q "$INTERVAL"); \
     watcher $(printf '%q ' "$@")" </dev/null >>"$LOG" 2>&1 &
 
-printf '{"event":"watch_registered","watch_id":%s,"target":%s,"label":%s,"ledger":%s,"log":%s}\n' \
-    "$(jstr "$WATCH_ID")" "$(jstr "$TARGET")" "$(jstr "$LABEL")" "$(jstr "$LEDGER")" "$(jstr "$LOG")"
+printf '{"event":"watch_registered","watch_id":%s,"target":%s,"owner":%s,"label":%s,"ledger":%s,"log":%s}\n' \
+    "$(jstr "$WATCH_ID")" "$(jstr "$TARGET")" "$(jstr "$MAILBOX")" "$(jstr "$LABEL")" "$(jstr "$LEDGER")" "$(jstr "$LOG")"

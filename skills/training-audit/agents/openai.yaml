@@ -1,0 +1,4 @@
+interface:
+  display_name: "Training Audit"
+  short_description: "Diagnose training failures and choose controlled checks"
+  default_prompt: "Use $training-audit to inspect the saved run evidence, distinguish optimization failures from measurement and generalization problems, and choose the smallest useful next control."

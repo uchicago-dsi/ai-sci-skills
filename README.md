@@ -12,6 +12,7 @@ Each skill is intentionally compact. The shared versions encode decision rules a
 | --- | --- |
 | `slurm` | Submit, inspect, and debug Slurm jobs without mixing scheduler problems with runtime failures |
 | `experiment-design` | Propose the smallest experiment that changes a decision |
+| `training-audit` | Diagnose early validation decline and choose controlled optimization checks |
 | `sensemaking` | Check whether a finding makes sense before trusting it |
 | `skeptical-labmate` | Stress-test claims, baselines, and follow-up plans |
 | `lab-notebook` | Keep records restartable and auditable |

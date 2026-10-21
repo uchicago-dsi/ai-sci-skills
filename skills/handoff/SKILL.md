@@ -1,15 +1,27 @@
 ---
 name: handoff
-description: "Create a restart-ready handoff so a fresh agent or future turn can resume work without rereading the full conversation. Use when pausing work, ending a session, switching agents, or preparing a clean-context restart."
+description: "Create a short-lived, restart-ready handoff so a fresh agent can resume work without rereading the full conversation, and delete it once read. Use when pausing work, ending a session, switching agents, preparing a clean-context restart, or finding a handoff addressed to you."
 ---
 
 # Handoff
+
+## A Handoff Is Temporary
+
+- The project notebook or log is the running record. Do not keep a standing handoff file beside it
+  and update it as a second status page: the two drift, and a stale handoff misleads the next agent
+  more than having none.
+- Write a handoff only at an actual hand-off, when another agent or a fresh session takes over.
+  It points into the notebook; it does not replace it.
+- The receiving agent reads its handoff, confirms the notebook holds everything durable in it, moves
+  anything missing into the notebook, and then deletes the handoff.
+- An agent that finds an old handoff for its own lane treats it the same way: check, fold into the
+  notebook, delete.
 
 ## Optimize For Cold Restarts
 
 - A handoff is for a fresh agent with no working memory.
 - The goal is fast re-entry, not a narrative recap.
-- Update the canonical notebook or log first if the project already has one. Then write the handoff.
+- Update the canonical notebook or log first if the project already has one. Then write the handoff, and expect it to be deleted once read.
 - Compose this skill with domain skills such as `$lab-notebook`, `$job-babysitting`, or `$slurm`.
 
 ## Use This Contract

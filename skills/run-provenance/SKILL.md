@@ -18,6 +18,15 @@ Use three tiers so iteration stays fast without weakening durable evidence.
    provenance artifact. A read-only diagnostic that consumes immutable inputs and
    writes nothing anything else will consume is this tier by default; it needs no
    deliberation about which tier applies.
+
+   Write this tier's files into the expiring scratch directory that
+   `dir=$(agent-scratch <slug>)` creates, `$AGENT_SCRATCH_BASE/<project>/agent_scratch/<slug>`,
+   where a nightly sweep deletes any entry untouched for 14 days. Do not put it in
+   the repository or beside durable outputs, where it outlives its purpose and a
+   later reader cannot tell it from evidence. Anything that turns out to be
+   needed downstream moves to a real run directory, with its README, before it
+   expires. If `agent-scratch` reports that no base is set on this cluster, ask
+   rather than choosing a directory.
 2. **Exploratory scheduled smokes.** Uncommitted code is allowed when the run root
    automatically records the full base commit SHA, exact command, config hash,
    environment identity, immutable data/parent hashes, working-tree status, and an

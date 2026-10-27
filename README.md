@@ -46,6 +46,17 @@ long job finishes rather than having an agent poll for it. That skill ships
 `bin/await-notify` and `bin/await-event` for harnesses without built-in
 background notification; Claude Code has its own and does not need them.
 
+`run-provenance` sends disposable work to `bin/agent-scratch`, which creates
+`$AGENT_SCRATCH_BASE/<project>/agent_scratch/<slug>/` for whichever repository
+the agent is in. Each cluster needs two things once: its shell profile exports
+`AGENT_SCRATCH_BASE` (your scratch directory there), and a `scrontab` entry runs
+`agent-scratch sweep` nightly, which deletes entries untouched for 14 days:
+
+```
+#SCRON --time=00:30:00 --mem=1G
+17 3 * * * $HOME/.local/bin/agent-scratch sweep --days 14
+```
+
 ## Installation
 
 These skills use the common `SKILL.md` folder layout supported by several local coding and research agents (Cursor, Claude Code, Codex, Gemini CLI). Install them by copying or symlinking the skill folders into your agent's skills directory.

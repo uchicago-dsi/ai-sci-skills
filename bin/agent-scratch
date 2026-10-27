@@ -1,0 +1,105 @@
+#!/usr/bin/env bash
+# Give an agent a private scratch directory for one-off work, and expire what
+# nobody has touched for a while.
+#
+# A probe, a throwaway script, or a one-off measurement that no later run will
+# consume belongs somewhere that cleans itself up. Left beside durable outputs,
+# it outlives its purpose and a later reader cannot tell it from evidence.
+# Every project on a cluster shares one layout:
+#
+#   $AGENT_SCRATCH_BASE/<project>/agent_scratch/<slug>/
+#
+# AGENT_SCRATCH_BASE is the user's scratch directory on this cluster; each
+# cluster's shell profile exports it. <project> is the name of the repository
+# you are working in, so a worktree resolves to the project it belongs to.
+#
+# Usage:
+#   agent-scratch <slug> [--project NAME]   create (if needed) and print the directory
+#   agent-scratch root [--project NAME]     print the project's agent_scratch root
+#   agent-scratch sweep [--days N]          delete expired entries (Slurm only)
+#
+# The sweep deletes an entry under any project's agent_scratch/ when nothing in
+# it has been modified for N days (default 14) and no queued or running job of
+# this user names a path inside it. It walks the trees it checks, so it refuses
+# to run outside a Slurm allocation. Schedule it with scrontab once per cluster.
+# Anything worth keeping must be moved to a real run directory before it expires.
+
+set -euo pipefail
+
+die() { echo "agent-scratch: $*" >&2; exit 2; }
+
+base() {
+  [[ -n "${AGENT_SCRATCH_BASE:-}" ]] ||
+    die "AGENT_SCRATCH_BASE is not set; this cluster's shell profile must export it"
+  [[ -d "$AGENT_SCRATCH_BASE" ]] || die "AGENT_SCRATCH_BASE does not exist: $AGENT_SCRATCH_BASE"
+  printf '%s\n' "${AGENT_SCRATCH_BASE%/}"
+}
+
+project_name() {
+  local explicit=$1 common
+  if [[ -n "$explicit" ]]; then
+    printf '%s\n' "$explicit"
+    return
+  fi
+  # The common git dir is the main checkout's .git for every worktree, so its
+  # parent names the project even from a worktree with an arbitrary name.
+  common=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null) ||
+    die "not inside a git repository; pass --project NAME"
+  basename "$(dirname "$common")" | tr '[:upper:]' '[:lower:]'
+}
+
+valid_name() {
+  [[ "$1" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || die "invalid name: '$1' (letters, digits, . _ - only)"
+}
+
+sweep() {
+  local days=$1 root entry recent live
+  [[ -n "${SLURM_JOB_ID:-}" ]] || die "sweep walks directory trees; run it inside a Slurm job"
+  [[ "$days" =~ ^[0-9]+$ && "$days" -ge 1 ]] || die "--days must be a positive integer"
+  root=$(base)
+  live=$(squeue -h -u "$USER" -o '%Z|%o|%k' 2>/dev/null) || die "squeue failed; refusing to sweep blind"
+  shopt -s nullglob
+  for entry in "$root"/*/agent_scratch/*; do
+    [[ -d "$entry" && ! -L "$entry" ]] || continue
+    # find includes the entry itself, so a touched directory counts as recent.
+    if [[ -n "$(find "$entry" -newermt "$days days ago" -print -quit 2>/dev/null)" ]]; then
+      continue
+    fi
+    if awk -F'|' -v e="$entry" '{ for (i = 1; i <= NF; i++)
+          if ($i == e || index($i, e "/") == 1) found = 1 }
+        END { exit !found }' <<<"$live"; then
+      echo "$(date -Is) kept (named by a queued job) $entry" | tee -a "$(dirname "$entry")/.sweep.log"
+      continue
+    fi
+    rm -rf --one-file-system -- "$entry"
+    echo "$(date -Is) deleted (untouched ${days} days) $entry" | tee -a "$(dirname "$entry")/.sweep.log"
+  done
+}
+
+[[ $# -ge 1 ]] || die "usage: agent-scratch <slug> | root | sweep [--days N]"
+command=$1
+shift
+project="" days=14
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --project) project=${2:?--project needs a value}; shift 2 ;;
+    --days) days=${2:?--days needs a value}; shift 2 ;;
+    *) die "unknown argument: $1" ;;
+  esac
+done
+
+case "$command" in
+  sweep) sweep "$days" ;;
+  root)
+    name=$(project_name "$project"); valid_name "$name"
+    printf '%s/%s/agent_scratch\n' "$(base)" "$name"
+    ;;
+  *)
+    valid_name "$command"
+    name=$(project_name "$project"); valid_name "$name"
+    directory="$(base)/$name/agent_scratch/$command"
+    mkdir -p -m 700 "$(dirname "$directory")"
+    mkdir -p -m 700 "$directory"
+    printf '%s\n' "$directory"
+    ;;
+esac

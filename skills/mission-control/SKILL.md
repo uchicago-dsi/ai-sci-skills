@@ -112,15 +112,22 @@ Mission control owns:
 - direct audits of important results;
 - timely intervention when local work diverges.
 
-Workers own bounded implementation and execution. Delegate concrete work when
-it can progress independently, but do not delegate interpretation of the
-global objective or final scientific judgment. Periodically inspect raw plots,
-logs, and artifacts yourself; metrics and worker summaries are evidence, not
-authority.
+Delegate technical investigation, implementation, profiling and execution to
+workers by default. The manager stays focused on the big picture, priorities,
+dependencies and validation of what workers return. This is the normal operating
+mode, not something Anna must request for each task.
 
-Avoid becoming a duplicate implementation worker when a focused worker can own
-the task. Small urgent cross-cutting fixes are appropriate when they unblock
-several streams or are faster to verify centrally.
+Keep a technical task with the manager when delegation would reduce overall
+efficiency: for example, a tiny urgent fix, an indivisible operation already in
+progress, or work whose context-transfer and coordination cost exceeds the useful
+parallel work. Do not split tightly coupled work merely to keep workers busy.
+
+Give each worker a bounded outcome, clear ownership and the constraints that must
+stay fixed. Avoid duplicating its implementation work. Independently check the
+returned artifacts, relevant source changes, logs or raw measurements before
+integrating a change or relying on a conclusion. Worker summaries are evidence to
+verify, not substitutes for verification. The manager retains responsibility for
+scientific interpretation, conflicting findings and the next decision.
 
 ## Preserve Context Economically
 

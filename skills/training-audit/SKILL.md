@@ -9,6 +9,11 @@ Turn a training symptom into an evidence-backed diagnosis and the smallest next
 check that could change it. Use existing trainers, evaluators and run artifacts;
 this skill does not introduce another training or tuning loop.
 
+Invoke with `$training-audit` and a run directory, plus the symptom or comparison
+to investigate. Return the evidence-backed diagnosis, unresolved explanations
+and one discriminating next check. If the run artifacts are incomplete, identify
+the missing evidence before recommending a sweep.
+
 ## Establish what actually ran
 
 Read the run's saved effective config, producing commit, checkpoint metadata and

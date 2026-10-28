@@ -14,6 +14,7 @@ hyperparameter recipes. Select relevant rows; do not run every check by default.
 | Resume changes the curve | Checkpoint step, optimizer moments, parameter ordering, scheduler position, scaler, RNG and sampler/cursor, teacher EMA if used | Reconcile the saved boundary; an intentional state reset is a new experiment, not an invisible continuation |
 | Training looks healthy but exposure is low | Unique source units, repeat counts, sampling weights, data stalls, rejected inputs | Reconcile data coverage and throughput; additional optimizer updates may mostly repeat the same examples |
 | Async evaluation falls behind | Checkpoint hashes, evaluator queue/failures, complete registered endpoint set | Fix the existing evaluation path. Do not count absent results toward patience or bypass a durable stop decision on resume |
+| A short tuning run appears best | Matched presentations, LR history and fraction of the decay schedule completed | Treat the ranking as provisional; check that it survives the relevant longer schedule before promoting the recipe |
 
 ## Numerical and optimization gotchas
 

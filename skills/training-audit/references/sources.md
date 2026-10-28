@@ -21,6 +21,32 @@ batch-dependent SSL objectives. Illustrative thresholds and warmup/clipping
 recipes are not universal defaults. This is the closest broad handbook located,
 not a claim that it comprehensively covers modern foundation-model training.
 
+Google also hosts the [Deep Learning Tuning Playbook](https://developers.google.com/machine-learning/guides/deep-learning-tuning-playbook).
+Checked its overview on 2026-10-18: the page is marked last updated 2025-08-25
+and describes the GitHub document as an earlier version. Its update date does
+not establish that every technical recommendation changed. The detailed scope above remains
+bound to the inspected GitHub revision.
+
+Also read the hosted [training-pipeline guidance](https://developers.google.com/machine-learning/guides/deep-learning-tuning-playbook/additional-guidance),
+[run-duration guidance](https://developers.google.com/machine-learning/guides/deep-learning-tuning-playbook/number-of-steps)
+and [learning-rate appendix](https://developers.google.com/machine-learning/guides/deep-learning-tuning-playbook/learning-rate)
+on 2026-10-18 (pages marked updated 2025-08-25). Reading scope: evaluation
+cadence and sampling, checkpoint selection, distributed execution details,
+short-horizon tuning bias and schedule/budget interactions; learning-rate
+appendix through its decay-schedule discussion.
+
+Consequences for this tool: keep periodic development membership fixed; account
+for minority-class counts and padded evaluation rows; bind asynchronous scores
+to the actual checkpoint. Early tuning rankings need not survive longer runs,
+especially when the decay schedule changes. The guide recommends retrospective
+checkpoint selection and generally treats prospective early stopping as
+unnecessary. That recommendation does not replace a project's approved stopping
+policy. A selected checkpoint is not an unbiased final-test estimate. Its
+distributed RNG advice also needs framework-specific sampler interpretation;
+do not blindly assign different sampler seeds to ranks that must partition one
+shared permutation. Consult hosted topic pages when refreshing recommendations
+rather than assuming the GitHub and hosted versions match.
+
 ## Framework-specific execution details
 
 PyTorch **2.6** documentation, selected to match the Prima runs under review;

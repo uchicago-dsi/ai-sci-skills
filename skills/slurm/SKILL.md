@@ -192,6 +192,14 @@ limits. Honor a stricter site or project limit.
   before launching expensive work.
 - Array stdout/stderr paths must contain `%A_%a`. A shared `%j` log can truncate or
   interleave task evidence.
+- Set the submitting process's umask before invoking `sbatch` for protected runs.
+  Slurm opens stdout/stderr before the batch wrapper executes, so a wrapper's
+  `umask 077` cannot protect those files. Verify one actual log's mode; for jobs
+  already pending, precreate their exact log paths with restrictive permissions
+  without truncating existing contents.
+- When a wrapper resolves its checkout from `SLURM_SUBMIT_DIR`, invoke `sbatch`
+  with its process cwd set to the pinned worktree and record that cwd. `--chdir`
+  alone does not change the submission-directory value the wrapper reads.
 - Do not inherit a runtime default — device, worker count, partition, shard count —
   from an existing wrapper without checking what it costs. An inherited value
   carries no evidence that anyone measured it, and a wrong one can multiply a job's

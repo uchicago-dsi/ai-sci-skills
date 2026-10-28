@@ -22,6 +22,21 @@ Search before creating an owner. If none fits a genuinely new capability, create
 - Parsimony means less code to own — not fewest files, shortest diff, or clever one-liners. Readable, explicit code beats a compressed version.
 - Never satisfy the request by solving a smaller or easier scientific problem than the one asked for.
 
+## Mark Copied Source Where It Lives
+
+When copying or adapting third-party code, put a searchable `SOURCE_COPY:`
+comment next to each retained block. Record the source URL, commit/version,
+file or function, license, and substantive local changes. A shared nearby
+comment may cover a clearly identified contiguous block. Copy only the pieces
+needed; preserving an obsolete upstream launcher is not required for fidelity.
+An ordinary import is dependency reuse, not copied source.
+
+During experimentation, these comments suffice for project acknowledgements;
+do not add speculative README entries. Before publishing or releasing the
+system, search for `SOURCE_COPY:` and acknowledge surviving components in the
+README. Preserve license-required copyright, attribution and notices from the
+moment code is copied; those obligations cannot wait for publication.
+
 ## Express Cohesive Families As Directories
 
 Prefer a meaningful package hierarchy over a flat directory of long,
@@ -117,6 +132,21 @@ source, so a superseded path need not stay executable — and a still-runnable
 invalid path is worse than an absent one, because a later reader cannot tell which
 is current. This does not require a maintenance session and the maintenance-lane
 rules do not restrict it.
+
+## Remove One-Off Editing Helpers
+
+Run disposable edits and migrations through standard input when practical. If a
+one-off helper must be written to disk, delete it and its temporary launch files
+as part of finishing the task, without waiting for a separate cleanup request.
+First verify that no queued/running job or current caller still needs the files;
+defer deletion only with that concrete dependency and its cleanup condition
+recorded in the owning notebook. Do not retain unused helpers as backups.
+
+Keep the resulting maintained code/config and the useful change record, rather
+than the script that mechanically edited them. A producer needed to regenerate a
+scientific artifact is not disposable: integrate it into the owning module and
+record its invocation/provenance. Apply the same cleanup to delegated workers
+before their changes are integrated.
 
 ## Prefer One Owner To Several Copies
 

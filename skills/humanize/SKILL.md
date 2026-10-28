@@ -55,7 +55,7 @@ Load exactly one register file from `registers/` and apply it on top of
 everything below:
 
 - `talk.md` — slides, PI and progress updates, lab meetings, notes, chat,
-  briefs. **This is the default when no register is named.**
+  briefs. **This is the fallback when neither a register nor a specialist audience is specified.**
 - `journal-imrad.md` — a manuscript for a peer-reviewed journal in the
   Introduction / Methods / Results / Discussion tradition.
 - `ml-conference.md` — a machine learning conference submission with open or
@@ -63,10 +63,15 @@ everything below:
 - `specialist-talk.md` — slides, briefs and emails for collaborators who are
   experts in the measurement (e.g. MRI physicists): the field's vocabulary
   stays unglossed, but every experiment and every figure is explained in full.
+- `design-doc.md` — a document saying how a system is supposed to work, read by
+  the person who decides whether it matches their intent.
 
-Take the register from `$ARGUMENTS` when it is named. Otherwise use `talk.md`,
-and say which register you used in the summary so a wrong guess is visible.
-Never infer a register silently from the file type.
+Take the register from `$ARGUMENTS` when it is named. Otherwise, for slides,
+briefs or emails explicitly addressed to domain specialists (such as MRI
+physicists), use `specialist-talk.md`. Follow a documented audience profile
+when one applies; for other requests use `talk.md`. Say which register you
+used in the summary so a wrong guess is visible. Do not infer specialist
+expertise from technical vocabulary or file type alone.
 
 Where a register file and this file disagree, the register file wins: it exists
 precisely to carry the rules that are not universal.

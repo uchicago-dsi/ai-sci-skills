@@ -89,9 +89,71 @@ When bumping a schema:
   through the live reader and confirm it lands in the superseded branch, or is
   read, as intended.
 
+## Keep Each Experiment In One Output Directory
+
+Choose one canonical output directory per experiment before launch. Keep its
+config, provenance, logs, checkpoints, metrics, training/validation curves and QC
+there, using subdirectories as needed. Asynchronous validation, QC workers,
+retries and later galleries write into the owning experiment's directory; a
+separate scheduler or coordinator does not create a separate scientific output
+root. Reference shared source data, reusable caches and parent experiments rather
+than copying them into every run.
+
+Bind this directory explicitly in the launcher and all worker requests. Keep
+curves and QC at stable, discoverable paths under it, and list those paths in the
+run README. Check the actual artifacts before reporting them available; an empty
+directory or pending request is not completed QC. Every experiment update must
+include a clickable absolute link to this directory so Anna can inspect it
+independently. Preserve frozen historical artifacts; apply layout changes to new
+work without rewriting a live run's recorded paths.
+
+Make the experiment root the entry point for finding its artifacts. Keep the
+root README concise, with a small map to the config, reproduction records,
+results, curves, checkpoints and QC, and label pending outputs explicitly. Use
+Markdown when prose is useful; JSON/CSV, figures and galleries can remain in
+their natural formats. Do not create a separate Markdown report for every worker
+or artifact merely to satisfy discoverability.
+
+Keep one canonical plot per scientific question, refreshed in place. Do not
+duplicate the same learning curve across trainer and evaluator directories;
+`training-run-hygiene` defines the combined training-and-validation figure.
+
+In saved Markdown, use links relative to that Markdown file's directory, including
+for outputs outside the repository. Verify local targets resolve from that
+location. Leading-slash filesystem paths do not reliably open in VS Code Markdown
+preview; reserve absolute clickable file links for chat. When the target is on
+another host or unavailable locally, give its host and copyable path rather than
+implying a working local link. Generated READMEs must follow this convention in
+their producer, not through hand edits to generated files.
+
 ## Write A README That Says How To Remake The Output
 
-Every new output/run directory needs a launcher-written `README.md` before it is
+For every new experiment, including exploratory scheduled smokes, automatically
+write a reproduction bundle into its canonical output directory before execution:
+
+- `README.md`: the hypothesis and changed settings; input/parent and split
+  identities; exact environment setup, checkout, launch, resume and evaluation
+  commands; resource requirements; and paths to checkpoints, metrics, curves and
+  QC. Give enough information to reproduce the experiment without chat or shell
+  history, including seeds, preprocessing and fixed readout settings through the
+  saved configuration.
+- A copy of the complete effective configuration actually used, plus its digest;
+  a hash or a link to a mutable source configuration alone is insufficient.
+- Git records from the execution checkout: full commit SHA, branch or detached
+  state, `git status --short --branch --untracked-files=all`, submodule revisions
+  when relevant, and staged/unstaged diffs. For permitted dirty exploratory runs,
+  also snapshot every untracked file that execution depends on. An empty diff
+  and clean status are meaningful records, not reasons to omit these files.
+- The resolved environment path, Python and dependency versions (or immutable
+  container digest), input manifest digests, exact command and scheduler receipts.
+
+Capture these automatically at submission, verify their bindings at execution,
+and preserve the original records on resume; append attempt-specific records
+rather than replacing the original provenance. Keep credentials and PHI out of
+the bundle. This requirement applies going forward; do not retrofit historical
+experiments. Developer checks above remain exempt.
+
+Every new experiment root needs a launcher-written `README.md` before it is
 reported ready, recording the differentiator, launcher, config snapshot, queue/job
 IDs, run/fold paths, environment, commit, dirty-state summary, and important
 results. Capture provenance on the submitting host and pass it into jobs whose
@@ -125,13 +187,11 @@ interpretation goes in a separate file (`NOTES.md`) that no producer ever writes
 Never append to a generated README by hand. A figure re-render that rewrote a
 README erased its results section, and nobody noticed until the numbers were needed.
 
-Scale this to what the artifact is for. The full form is owed by anything that
-could become a parent, a reusable cache, an export, or decision-grade evidence. A
-disposable probe whose whole output is a log, and which one printed command
-regenerates, owes the command, the commit, and what it measured, and nothing else:
-input digests exist so a later reader can tell whether an input moved, and there is
-no later reader for an artifact nobody will consume. When in doubt, write the full
-form — a probe is sometimes promoted, and the long form costs minutes.
+Scale the README's detail to what the artifact is for, while retaining the
+reproduction bundle for every experiment. Developer checks remain exempt. A
+reusable cache, export or decision-grade artifact needs enough schema and input
+detail for its next consumer to rebuild and interpret it; a disposable mechanics
+check needs only its command, commit and what it measured.
 
 ## Freeze A Checkout By Execution Pin, Not For Its Lifetime
 

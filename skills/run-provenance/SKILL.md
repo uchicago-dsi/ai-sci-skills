@@ -180,6 +180,14 @@ hand, so it cannot drift from what it describes, and write it from the first uni
 of work rather than only from a reducer, so an interrupted run is still documented.
 A cache or export nobody can rebuild is one nobody can trust.
 
+A cache's README also declares how large it may grow, on a line of its own such as
+`Size cap: 2 TiB`, and the code that fills it stops or evicts before passing that
+size. A cache that writes on every miss with no cap grows until the storage quota
+stops it, and then every job sharing that quota fails, not only the cache's own.
+Two feature caches once grew 477 GiB an hour this way and came within two hours
+of filling a shared scratch quota. Storage scanners can find a cache that
+declares no cap by that line's absence.
+
 A generated README is rewritten every time its generator runs, so anything written
 into it by hand is lost on the next re-render, silently and with exit 0. Either the
 generator writes the results itself, from the run's own summary files, or hand-added

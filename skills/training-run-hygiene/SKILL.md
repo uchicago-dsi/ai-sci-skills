@@ -34,6 +34,13 @@ defaults for other clusters. Do not restart shared infrastructure to onboard a l
   before reading artifacts or contacting the server. Direct SDK callers must provide
   it in `trackio.init(config=...)`; the exporter does not intercept SDK calls. Verify
   the saved server description after publishing.
+- Check evaluation execution and dashboard enrollment separately. Before launching
+  a scientific run, verify that its exact `experiment_dir` and every planned task
+  artifact are mapped in the configured publisher registration to the common
+  metric keys. An ancestor, sibling or historical evaluation directory does not
+  cover a new output root. Enroll runs actually being launched; preserve existing
+  run identities. Verify the first saved measurements through the server when it
+  is available.
 - Publish training/validation losses, applicable task metrics, the canonical
   learning curve and applicable saved qualitative QC. Namespace metric keys by
   quantity and role. Use clear `train` and `eval` labels, not a metric role named

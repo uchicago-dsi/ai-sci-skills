@@ -269,6 +269,27 @@ representative large case's peak RSS at the intended worker count and leave node
 headroom. Keep the worker count as runtime plumbing, so an idempotent shard can
 resume at lower concurrency after an OOM without changing the scientific contract.
 
+## Size Requests To Protect Fair Share
+
+Under multifactor priority, fair share is charged for what a job reserves
+(CPUs, memory and GPUs, weighted by the site's billing, times wall time), whether
+it uses them or not. Splitting the same work into more shards costs about the
+same; per-shard startup and over-reservation are what add up. So:
+
+- Request memory from the measured peak plus about 30%, never less than the job
+  needs. For an allocation that runs several steps, the peak is the largest sum
+  of concurrent steps' `MaxRSS` (`sacct -j <id> -o JobID,Start,End,MaxRSS`), not
+  the batch step's, which is near zero. Leave room for workloads the owner
+  expects next.
+- A long-lived allocation (a server or runtime holding GPUs for days) states its
+  billing units per hour (`scontrol show job` shows `billing=`), and its owner
+  re-sizes it from measured use when it is renewed.
+- Put CPU-only work on the cheapest partition that fits; give a controller that
+  only submits and waits 1 CPU and the memory it measured.
+- Keep shards long enough (minutes, not seconds) that startup does not dominate.
+
+Site billing weights and decay half-life belong in the project's site notes.
+
 ## Lock A Shared External Resource For The Whole Run
 
 A long-running driver that owns a shared external resource — a delivery share, a

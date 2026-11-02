@@ -1,0 +1,19 @@
+# slack-notifications settings. Copy to ~/.config/slack-notifications/config
+# (mode 600) and fill in. This file holds IDs and paths only, never secrets:
+# the webhook URL and bot token live in their own owner-only files.
+
+# --- Slack -------------------------------------------------------------------
+SLACK_CHANNEL=C0123ABCDEF             # channel ID: channel name > About > bottom
+SLACK_AUTHORISED=U0123AAAAAA,U0123BBBBBB   # member IDs whose requests may be acted on
+SLACK_WEBHOOK_FILE=$HOME/.slack-webhook      # for slack-notify
+SLACK_BOT_TOKEN_FILE=$HOME/.slack-bot-token  # for slack-reply and slack-inbox
+# SLACK_EXTRA_SECRET_FILES=$HOME/.other-token:$HOME/.another   # also never posted
+
+# --- slurm-slack-watch (all optional) ----------------------------------------
+# A job's run dir is the directory of its --output log.
+# SSW_PROGRESS_GLOB='results/*.json'   # files that count as progress
+# SSW_TOTAL=500                        # expected count, shown as done/total
+# SSW_LOGS='server.log'                # extra logs to scan, relative to the run dir
+# SSW_READY_RE='Application startup complete'   # "service is up" line
+# SSW_QUOTE_ERRORS=0                   # keep log lines out of Slack
+# SSW_MIN_GAIN=5 SSW_HEARTBEAT=21600 SSW_SURVIVE=150 SSW_EARLY_MIN=10

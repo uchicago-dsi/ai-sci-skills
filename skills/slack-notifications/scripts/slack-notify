@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# Post a message to one Slack channel through an incoming webhook.
+#
+#   slack-notify "job 123456 started on node07"
+#
+# The webhook URL is a secret (anyone holding it can post to the channel), so it
+# lives in an owner-only file, SLACK_WEBHOOK_FILE (default ~/.slack-webhook), never
+# in a script, repository, environment variable or command line.
+# SLACK_NOTIFY_DRYRUN=1 runs every check but prints instead of posting.
+set -euo pipefail
+
+here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+cfg=${SLACK_NOTIFY_CONFIG:-$HOME/.config/slack-notifications/config}
+[[ -r $cfg ]] && source "$cfg"
+url_file=${SLACK_WEBHOOK_FILE:-$HOME/.slack-webhook}
+
+(( $# > 0 )) || { echo "usage: slack-notify MESSAGE..." >&2; exit 2; }
+"$here/slack-secret-check" --private "$url_file" || exit 1
+
+msg="$*"
+printf '%s' "$msg" | "$here/slack-secret-check" || exit $?    # 3 = blocked
+[[ -n ${SLACK_NOTIFY_DRYRUN:-} ]] && { echo "slack-notify: would send: $msg"; exit 0; }
+
+# jq builds the JSON body, so quotes, newlines and backslashes in the message are
+# escaped correctly instead of breaking the payload.
+payload=$(jq -n --arg text "$msg" '{text: $text}')
+
+# The URL reaches curl on stdin as a config line (-K -), not as an argument that
+# `ps` would show. -f turns an HTTP error into a non-zero exit; --max-time stops
+# a hung request from blocking the caller.
+printf 'url = "%s"\n' "$(<"$url_file")" |
+  curl -K - -fsS --max-time 10 -H 'Content-Type: application/json' \
+       --data "$payload" -o /dev/null

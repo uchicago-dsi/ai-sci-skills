@@ -243,17 +243,24 @@ for a plot. Training, asynchronous validation and QC workers consume the same
 recorded measurements and plotting owners. Keep common readout settings fixed
 across checkpoints and ablations.
 
+All example/image QC uses grids of one complete batch: inputs, augmentations,
+outputs, reconstructions, scores, attention maps and native-detail crops. Include
+every batch member and every applicable consumed view and context/reference role,
+with clear labels. Use the data loader's grouping and configured batch size;
+identify a fixed QC batch explicitly. Save the grids in the experiment output
+directory and tracker. Remove superseded single-input panels from active
+registration and derived tracker copies; preserve originals required by immutable
+receipts. Do not publish individual-image drilldowns. Reuse the shared grid
+renderer across experiments. Numerical learning curves remain separate figures.
+
 Save applicable qualitative QC at initialization and the configured cadence,
 alongside numerical checks that can reveal failure even when examples look
 plausible. Use a fixed, appropriately split QC roster and record selection rules,
-source identities, scores and spatial coordinates where applicable. For grouped
-exemplar galleries, use one group per column and configure at least 16 examples
-from distinct source images down the rows. Page large collections without
-omitting groups; retain empty columns and show available counts when fewer than
-16 eligible sources exist. Do not duplicate examples to fill gaps. Keep different
-learned representations explicitly identified and use their actual outputs for
-selection. Save coverage, concentration, diversity and other applicable health
-measurements beside the figures, using shared renderers with thin adapters.
+source identities, scores and spatial coordinates where applicable. Diagnostic
+grouping must preserve complete batch membership. Keep different learned
+representations explicitly identified and use their actual outputs for selection.
+Save coverage, concentration, diversity and other applicable health measurements
+beside the grids, using shared renderers with thin adapters.
 
 When replacing duplicated QC, update current callers and remove the superseded
 implementation in the same scoped change. Preserve immutable historical artifacts
@@ -389,11 +396,3 @@ continues.
 - Record the split policy in run provenance. Once a run writes train/validation
   manifests, resume must reload those snapshots and fail if the current split code
   would regenerate different membership. Never overwrite a run's split in place.
-When showing model inputs, make a grid of one complete batch the default view.
-Include every batch member and every consumed view, context/reference input and
-augmentation, with clear role labels. Use the data loader's grouping and batch
-size; identify a fixed QC batch explicitly. Save the grid prominently in the
-experiment output directory and tracker so it can be inspected in one image.
-Individual images and crops are optional drilldowns, never the primary input QC.
-Reuse the shared grid renderer across experiments.
-

@@ -49,6 +49,12 @@ defaults for other clusters. Do not restart shared infrastructure to onboard a l
   Record trained versus evaluated checkpoint, pending/failed readouts, denominator
   and selected versus latest checkpoint. Label missing scores pending, failed or
   unavailable as appropriate; never substitute zero.
+- Use one shared tracking adapter to publish held-out metrics with the `/eval`
+  suffix; normalize incoming `/val` there so future runs cannot split the same
+  endpoint across two charts. Keep validation/test roles in run metadata and
+  preserve distinct endpoints and units, such as breast versus patient AUC.
+  Check the published metric keys after onboarding a run. Replace superseded
+  dashboard entries when migrating names; preserve authoritative run artifacts.
 - Keep evaluation names common across procedures: metric keys identify the
   quantity, dataset/endpoint and split, while the run name/config identifies the
   encoder, pooling, readout and other method choices. Two pooling/readout arms

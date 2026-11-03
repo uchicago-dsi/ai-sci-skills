@@ -389,3 +389,11 @@ continues.
 - Record the split policy in run provenance. Once a run writes train/validation
   manifests, resume must reload those snapshots and fail if the current split code
   would regenerate different membership. Never overwrite a run's split in place.
+When showing model inputs, make a grid of one complete batch the default view.
+Include every batch member and every consumed view, context/reference input and
+augmentation, with clear role labels. Use the data loader's grouping and batch
+size; identify a fixed QC batch explicitly. Save the grid prominently in the
+experiment output directory and tracker so it can be inspected in one image.
+Individual images and crops are optional drilldowns, never the primary input QC.
+Reuse the shared grid renderer across experiments.
+

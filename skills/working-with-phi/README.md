@@ -6,9 +6,10 @@ that reads the data. What comes back is either a numeric summary, released
 automatically, or a file you have read and released.
 
 The usual alternative is to develop on synthetic data and have a person run the
-real thing. Here the agent debugs on the real data, through jobs whose output it
-can't see. Building a faithful synthetic copy costs about as much as that
-debugging.
+real thing. That means building the synthetic data, debugging the code on it,
+and then debugging it again on the real data, which rarely behaves the same.
+Here there is one round: the agent debugs on the real data, through jobs whose
+output it can't see.
 
 Claude Code only for now.
 

@@ -459,7 +459,7 @@ def write_settings(policy):
 def cmd_settings(policy, args):
     if not args.write:
         print(json.dumps(recommended_settings(policy, with_hooks=not plugin_enabled(policy)), indent=2))
-        print("\nMerge this into {} (it names this cluster's paths, so keep it out of git), or rerun "
+        print("\nMerge this into {} (it names this machine's paths, so keep it out of git), or rerun "
               "with --write.".format(settings_files(policy)[2]), file=sys.stderr)
         return
     print("wrote {}; restart Claude Code in this project for it to take effect".format(write_settings(policy)))

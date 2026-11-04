@@ -1,9 +1,12 @@
 # working-with-phi
 
-Lets a coding agent work on protected health information, on a Slurm cluster or
-on a single machine, without the data entering its session. The agent writes and submits the code
-that reads the data. What comes back is either a numeric summary, released
-automatically, or a file you have read and released.
+Lets a coding agent work on protected health information without the data
+entering its session, on your own machine or on a shared cluster. The agent
+writes the code that reads the data and runs it with `phi run`, which sends
+everything the code prints or saves to a folder the agent cannot read; on a
+Slurm cluster it can submit the same code as a job instead. What comes back is
+either a numeric summary, released automatically, or a file you have read and
+released.
 
 The usual alternative is to develop on synthetic data and have a person run the
 real thing. That means building the synthetic data, debugging the code on it,
@@ -24,7 +27,9 @@ Three places on disk matter:
 | Held area | everything a job prints or saves | no |
 | Released area | what you have read and let through, plus each job's numeric summary | yes |
 
-The agent writes jobs, submits them, and reads only the released area.
+Here a job is any run of the agent's code that touches the data: `phi run` on
+the machine you are on, or a Slurm job on a cluster. The agent starts jobs and
+reads only the released area.
 Before each tool call, Claude Code runs a check (a hook) that refuses any
 command reading a protected folder or the held area. An operating-system
 sandbox also stops any script the agent runs directly from opening them.
@@ -52,12 +57,12 @@ You need, once:
   ln -s ~/.local/share/labdisk-env/bin/labdisk ~/.local/bin/labdisk
   ```
 
-- **On Linux, `bubblewrap` and `socat`.** The sandbox is built on these two
-  system packages: `bubblewrap` runs a command inside a restricted view of the
-  filesystem, and `socat` carries the command's network traffic across that
-  boundary. On a cluster they must be on every node where you run Claude Code;
-  if either is missing, ask the administrators to install it. On macOS the
-  sandbox is built in and needs nothing. Windows needs WSL2.
+- **The sandbox's system packages.** On macOS the sandbox is built in and needs
+  nothing. On Linux it is built on two packages: `bubblewrap`, which runs a
+  command inside a restricted view of the filesystem, and `socat`, which
+  carries the command's network traffic across that boundary. Install them
+  with your package manager, or on a shared cluster ask the administrators to
+  install them on every node where you run Claude Code. Windows needs WSL2.
 - **tmux**, optionally. With it, review files open in a pane beside the agent's.
 
 ## Step 1: set up the project
@@ -96,7 +101,7 @@ list, so a refusal can never be worked around by un-protecting something.
 Ask for what you want, for example `Count the exams in each patient folder.`
 
 The first time, the agent doesn't know how the data is laid out, so it first
-runs `labdisk layout` on the data folders, as a Slurm job where there is one. That writes a
+runs `labdisk layout` on the data folders (on a Slurm cluster, as a job). That writes a
 summary in which every name is replaced by its shape (`9{8}` means eight
 digits, `A{5}` five capital letters) and folders with the same shape are merged
 into one line. Only names that recur in many folders, such as `DICOM`, appear
@@ -132,9 +137,9 @@ one review file and asks you to read it.
 
 ## Day to day
 
-- **While a job runs, you do nothing.** On a Slurm cluster the agent submits
-  it as a job with its log in the held area; elsewhere it runs it with
-  `phi run`, which sends every line of output there.
+- **While a job runs, you do nothing.** The agent runs it with `phi run`,
+  which sends every line of output to the held area, or on a Slurm cluster
+  submits it with its log there.
 - **When a job fails, you usually do nothing either.** Each job leaves a
   numeric summary that is released without review: the exit code, line counts,
   any counts the job recorded, and for a Python error the error's type and the
@@ -185,8 +190,9 @@ with no packages. `labdisk layout` needs Python 3.11 or newer.
 - This setup stops accidents by an agent that is trying to follow the rules.
   An agent working against them could, for example, submit a job that copies
   data into the released area.
-- Slurm is the only scheduler it checks. Jobs submitted to another scheduler
-  (PBS `qsub`, LSF `bsub`) write their logs wherever their own options say.
+- On a cluster, Slurm is the only scheduler it checks. Jobs submitted to
+  another scheduler (PBS `qsub`, LSF `bsub`) write their logs wherever their own
+  options say; run them with `phi run` instead.
 - The hooks see each command as typed. A script the agent runs directly, which
   opens a protected folder without naming it on the command line, is stopped
   only by the sandbox.

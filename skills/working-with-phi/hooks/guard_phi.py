@@ -50,8 +50,9 @@ ASSIGNMENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
 PREFIX_WORDS = ("sudo", "exec", "time", "nohup", "env", "command", "builtin")
 
 HOW = ("Protected data reaches you only through the held area and a person's review: "
-       "submit with sbatch (log into the held area) or run with `phi run -- <command>`, "
-       "then `phi collect <id>` and `phi show <id>`, and read the result under the released area.")
+       "run it with `phi run -- <command>` or, on a Slurm cluster, submit it with its log in "
+       "the held area; then `phi collect <id>` and `phi show <id>`, and read the result under "
+       "the released area.")
 
 
 def segments(text):
@@ -148,7 +149,7 @@ def check_shell(policy, event):
     for first, words, piece in segments(text):
         if first in REMOTE_SHELLS:
             deny_tool("Refused: {} sends the remote command's output straight back here, unreviewed. "
-                      "Use sbatch with its log in the held area, or `phi run -- {}`.".format(
+                      "Use `phi run -- {}`, or sbatch with its log in the held area.".format(
                           first, " ".join(words)))
         if first == "sbatch":
             check_sbatch(policy, words, cwd)

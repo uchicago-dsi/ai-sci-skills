@@ -1,0 +1,503 @@
+#!/usr/bin/env python3
+"""Run work on protected data blind, and hand its output back only after a person has read it.
+
+    phi new NAME              make a held folder for a job; prints its path
+    phi run [--into DIR | --name NAME] -- CMD...
+                              run CMD with its output going to a held folder; prints a numeric summary
+    phi collect ID            gather a held folder into one review file; prints its path and size
+    phi show ID [--no-tmux]   open the review file for the person (a tmux pane, or tell them the path)
+    phi release ID            (person only) let a reviewed file through to the released area
+    phi reject ID REASON      (person only) turn it down, with a reason the agent can read
+    phi list                  every held folder and what has happened to it
+    phi check                 pass or fail for each protection layer; reads no data
+    phi settings [--write]    the Claude Code settings this project needs
+
+The project's `.claude/phi.json` says what is protected (see hooks/phi_policy.py).
+Everything written here is readable by its owner only.
+
+The summary `phi run` prints, and releases without review, holds only: exit code,
+line and byte counts of standard output and error, the exception type and the
+project file and line from a Python traceback (never its message), and named
+numeric counts the command wrote to $PHI_COUNTS. Anything else in that counts file
+keeps the counts held.
+
+Written for Python 3.6, the system Python on RHEL 8, so it needs no environment.
+"""
+import argparse
+import base64
+import datetime
+import getpass
+import hashlib
+import io
+import json
+import math
+import os
+import re
+import shlex
+import shutil
+import subprocess
+import sys
+
+HERE = os.path.dirname(os.path.realpath(__file__))
+HOOKS = os.path.join(os.path.dirname(HERE), "hooks")
+sys.path.insert(0, HOOKS)
+import phi_policy  # noqa: E402
+
+NAME = re.compile(r"^[a-z0-9][a-z0-9_-]{0,60}$")
+COUNT_KEY = re.compile(r"^[a-z][a-z0-9_]{0,40}$")
+EXCEPTION_TYPE = re.compile(r"^([A-Za-z_][A-Za-z0-9_.]*(?:Error|Exception|Exit|Interrupt|Warning|"
+                            r"Failure|StopIteration))(?::|$)")
+FRAME = re.compile(r'^\s*File "([^"]+)", line (\d+)')
+IMAGE_TYPES = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif",
+               ".svg": "image/svg+xml"}
+REVIEW_FILES = ("review.txt", "review.html")
+
+
+def fail(message):
+    sys.stderr.write("phi: " + message + "\n")
+    sys.exit(2)
+
+
+def policy_or_fail():
+    try:
+        policy = phi_policy.load()
+    except phi_policy.ConfigError as err:
+        fail(str(err))
+    if policy is None:
+        fail("no .claude/phi.json above {}; this project has not opted in".format(os.getcwd()))
+    return policy
+
+
+def private_dir(path):
+    if not os.path.isdir(path):
+        os.makedirs(path, 0o700)
+    os.chmod(path, 0o700)
+    return path
+
+
+def held_dir(policy, ident):
+    if not NAME.match(ident):
+        fail("{} is not a held-folder id".format(ident))
+    path = os.path.join(policy.held, ident)
+    if not os.path.isdir(path):
+        fail("no held folder {}".format(ident))
+    return path
+
+
+def new_id(policy, name):
+    if not NAME.match(name):
+        fail("name must be lower-case letters, digits, _ or -, starting with a letter or digit")
+    private_dir(policy.held)
+    taken = [int(m.group(1)) for m in (re.match(re.escape(name) + r"-(\d{3,})$", e)
+                                       for e in os.listdir(policy.held)) if m]
+    number = max(taken, default=0) + 1
+    while True:
+        ident = "{}-{:03d}".format(name, number)
+        try:
+            os.mkdir(os.path.join(policy.held, ident), 0o700)
+            return ident
+        except FileExistsError:
+            number += 1
+
+
+def line_count(path):
+    with open(path, "rb") as handle:
+        return sum(1 for _ in handle)
+
+
+def write_json(path, value):
+    tmp = path + ".tmp"
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as handle:
+        json.dump(value, handle, indent=1, sort_keys=True)
+        handle.write("\n")
+    os.replace(tmp, path)
+
+
+def traceback_facts(policy, stderr_path):
+    """(exception type, project file:line) from the last Python traceback, or (None, None)."""
+    with open(stderr_path, "rb") as handle:
+        handle.seek(max(0, os.path.getsize(stderr_path) - 200000))
+        lines = handle.read().decode("utf-8", "replace").splitlines()
+    starts = [i for i, line in enumerate(lines) if line.startswith("Traceback (most recent call last):")]
+    if not starts:
+        return None, None
+    block = lines[starts[-1]:]
+    location = None
+    for line in block:
+        frame = FRAME.match(line)
+        if frame:
+            path = phi_policy.resolve(frame.group(1))
+            if phi_policy.is_under(path, policy.project):
+                location = "{}:{}".format(os.path.relpath(path, policy.project), frame.group(2))
+    exception = None
+    for line in block[1:]:
+        if line and not line.startswith(" "):
+            match = EXCEPTION_TYPE.match(line)
+            exception = match.group(1) if match else None
+    return exception, location
+
+
+def numeric_counts(path):
+    """The counts file if it is a flat object of named finite numbers, else None."""
+    with open(path, encoding="utf-8") as handle:
+        value = json.load(handle)
+    if not isinstance(value, dict):
+        return None
+    for key, number in value.items():
+        if not COUNT_KEY.match(key) or isinstance(number, bool) or not isinstance(number, (int, float)):
+            return None
+        if isinstance(number, float) and not math.isfinite(number):
+            return None
+    return value
+
+
+def cmd_new(policy, args):
+    print(os.path.join(policy.held, new_id(policy, args.name)))
+
+
+def cmd_run(policy, args):
+    command = args.command[1:] if args.command[:1] == ["--"] else args.command
+    if not command:
+        fail("give the command after --")
+    if args.into:
+        folder = phi_policy.resolve(args.into)
+        if not phi_policy.is_under(folder, policy.held) or folder == policy.held:
+            fail("--into must be a folder inside the held area, {}".format(policy.held))
+        private_dir(folder)
+    else:
+        folder = os.path.join(policy.held, new_id(policy, args.name))
+    ident = os.path.relpath(folder, policy.held).split(os.sep)[0]
+    task = os.environ.get("SLURM_ARRAY_TASK_ID")
+    suffix = "-" + task if task else ""
+    out_path = os.path.join(folder, "stdout{}.txt".format(suffix))
+    err_path = os.path.join(folder, "stderr{}.txt".format(suffix))
+    counts_path = os.path.join(folder, "counts{}.json".format(suffix))
+    env = dict(os.environ, PHI_HELD=folder, PHI_COUNTS=counts_path)
+    os.umask(0o077)
+    with open(out_path, "wb") as out, open(err_path, "wb") as err, open(os.devnull, "rb") as nothing:
+        try:
+            code = subprocess.call(command, stdout=out, stderr=err, stdin=nothing, env=env)
+        except OSError as exc:
+            err.write("phi run could not start the command: {}\n".format(exc.strerror).encode())
+            code = 127
+    exception, location = traceback_facts(policy, err_path)
+    summary = {"id": ident, "exit_code": code, "exception_type": exception, "location": location,
+               "stdout_lines": line_count(out_path), "stdout_bytes": os.path.getsize(out_path),
+               "stderr_lines": line_count(err_path), "stderr_bytes": os.path.getsize(err_path)}
+    if task:
+        summary["array_task"] = int(task) if task.isdigit() else None
+    if os.path.isfile(counts_path):
+        try:
+            counts = numeric_counts(counts_path)
+        except ValueError:
+            counts = None
+        if counts is None:
+            summary["counts_held"] = "the counts file holds something other than named numbers"
+        else:
+            summary["counts"] = counts
+    write_json(os.path.join(folder, "summary{}.json".format(suffix)), summary)
+    released = private_dir(os.path.join(private_dir(policy.released), ident))
+    write_json(os.path.join(released, "summary{}.json".format(suffix)), summary)
+    print(json.dumps(summary, sort_keys=True))
+    sys.exit(code)
+
+
+def is_text(path):
+    with open(path, "rb") as handle:
+        head = handle.read(8192)
+    if b"\0" in head:
+        return False
+    try:
+        head.decode("utf-8")
+    except UnicodeDecodeError as err:
+        return err.start > len(head) - 4  # a multi-byte character cut at the end of the sample
+    return True
+
+
+def cmd_collect(policy, args):
+    folder = held_dir(policy, args.id)
+    listing, body, images, binaries = [], [], [], []
+    for root, dirs, files in os.walk(folder):
+        dirs.sort()
+        for name in sorted(files):
+            path = os.path.join(root, name)
+            rel = os.path.relpath(path, folder)
+            if rel in REVIEW_FILES or name.endswith(".tmp"):
+                continue
+            size = os.path.getsize(path)
+            kind = os.path.splitext(name)[1].lower()
+            if kind in IMAGE_TYPES:
+                images.append((rel, path, kind))
+                listing.append("  {}  {:,} bytes, image (in review.html)".format(rel, size))
+            elif is_text(path):
+                with open(path, encoding="utf-8", errors="replace") as handle:
+                    text = handle.read().splitlines()
+                listing.append("  {}  {:,} bytes, {:,} lines".format(rel, size, len(text)))
+                body.append("===== {} ({:,} lines) =====".format(rel, len(text)))
+                body.extend(text)
+                body.append("")
+            else:
+                binaries.append(rel)
+                listing.append("  {}  {:,} bytes, binary, not shown".format(rel, size))
+    limit = args.max_lines or policy.max_review_lines
+    if len(body) > limit:
+        fail("the review would be {:,} lines, over the limit of {:,}. A person cannot read that "
+             "closely. Make the job print counts, types and shapes instead of values, or pass "
+             "--max-lines if the person agrees to read more.".format(len(body), limit))
+    flags = policy.flag_lines("\n".join(body))
+    header = ["# Review {}".format(args.id), "",
+              "Read all of it. Delete anything that must not reach the agent, save, then run",
+              "    phi release {}".format(args.id),
+              "or  phi reject {} \"reason\"".format(args.id), "",
+              "Files:"] + listing
+    if images:
+        header.append("Images are in review.html beside this file; check them too.")
+    header += ["", "Lines that look like identifiers (line numbers in this file):"]
+    header += ["  none found"] if not flags else []
+    offset = len(header) + len(flags) + 2
+    header += ["  line {}: {}".format(number + offset, ", ".join(labels)) for number, labels in flags]
+    header += ["", ""]
+    review = os.path.join(folder, "review.txt")
+    fd = os.open(review, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as handle:
+        handle.write("\n".join(header + body) + "\n")
+    html = os.path.join(folder, "review.html")
+    if images:
+        fd = os.open(html, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write("<!doctype html><meta charset=utf-8><title>Review {}</title>\n".format(args.id))
+            for rel, path, kind in images:
+                with open(path, "rb") as image:
+                    data = base64.b64encode(image.read()).decode()
+                handle.write("<h3>{}</h3><img style='max-width:100%' src='data:{};base64,{}'>\n".format(
+                    rel.replace("<", "&lt;"), IMAGE_TYPES[kind], data))
+    elif os.path.exists(html):
+        os.unlink(html)
+    print("review file {}: {:,} lines, {:,} flagged as identifier-shaped, {} images, {} binary files "
+          "not shown. Next: phi show {}".format(review, len(header) + len(body), len(flags), len(images),
+                                                len(binaries), args.id))
+
+
+def cmd_show(policy, args):
+    review = os.path.join(held_dir(policy, args.id), "review.txt")
+    if not os.path.isfile(review):
+        fail("no review file yet; run phi collect {} first".format(args.id))
+    html = os.path.join(os.path.dirname(review), "review.html")
+    extra = (" It has images too: open {} in a browser on this machine.".format(html)
+             if os.path.isfile(html) else "")
+    after = " When they have read it they run `phi release {0}` or `phi reject {0} \"reason\"`.".format(args.id)
+    if os.environ.get("TMUX") and shutil.which("tmux") and not args.no_tmux:
+        subprocess.check_call(["tmux", "split-window", "-h", "less -R " + shlex.quote(review)])
+        print("Opened the review in a new tmux pane beside this one; it shows there and nothing from it "
+              "comes back here. Ask the person to read it (q closes the pane)." + extra + after)
+    else:
+        print("Ask the person to open the review outside this session, in their own terminal or editor:\n"
+              "    less {}\n".format(review) + extra.strip() + after)
+
+
+def cmd_release(policy, args):
+    folder = held_dir(policy, args.id)
+    review = os.path.join(folder, "review.txt")
+    if not os.path.isfile(review):
+        fail("no review file yet; run phi collect {} first".format(args.id))
+    target = private_dir(os.path.join(private_dir(policy.released), args.id))
+    copied, digest = [], hashlib.sha256()
+    for name in REVIEW_FILES:
+        source = os.path.join(folder, name)
+        if os.path.isfile(source):
+            with open(source, "rb") as handle:
+                data = handle.read()
+            digest.update(data)
+            fd = os.open(os.path.join(target, name), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+            with os.fdopen(fd, "wb") as handle:
+                handle.write(data)
+            copied.append(name)
+    rejected = os.path.join(target, "rejected.json")
+    if os.path.exists(rejected):
+        os.unlink(rejected)
+    write_json(os.path.join(target, "receipt.json"), {
+        "id": args.id, "released_by": getpass.getuser(),
+        "released_at": datetime.datetime.now().astimezone().isoformat(timespec="seconds"),
+        "files": copied, "sha256": digest.hexdigest(), "lines": line_count(review)})
+    print("released {} ({:,} lines). The agent can now read {}".format(args.id, line_count(review),
+                                                                       os.path.join(target, "review.txt")))
+
+
+def cmd_reject(policy, args):
+    held_dir(policy, args.id)
+    target = private_dir(os.path.join(private_dir(policy.released), args.id))
+    write_json(os.path.join(target, "rejected.json"), {
+        "id": args.id, "rejected_by": getpass.getuser(), "reason": args.reason,
+        "rejected_at": datetime.datetime.now().astimezone().isoformat(timespec="seconds")})
+    print("rejected {}; the agent can read the reason in {}".format(args.id, os.path.join(target, "rejected.json")))
+
+
+def cmd_list(policy, args):
+    if not os.path.isdir(policy.held):
+        print("no held folders yet")
+        return
+    for ident in sorted(os.listdir(policy.held)):
+        folder = os.path.join(policy.held, ident)
+        released = os.path.join(policy.released, ident)
+        state = []
+        summaries = sorted(n for n in os.listdir(folder) if re.match(r"summary(-\d+)?\.json$", n))
+        codes = []
+        for name in summaries:
+            with open(os.path.join(folder, name), encoding="utf-8") as handle:
+                codes.append(json.load(handle).get("exit_code"))
+        if codes:
+            state.append("exit " + ",".join(str(c) for c in codes))
+        state.append("collected" if os.path.isfile(os.path.join(folder, "review.txt")) else "not collected")
+        if os.path.isfile(os.path.join(released, "receipt.json")):
+            state.append("released")
+        if os.path.isfile(os.path.join(released, "rejected.json")):
+            state.append("rejected")
+        print("{}  {}".format(ident, ", ".join(state)))
+
+
+def settings_files(policy):
+    return [os.path.expanduser("~/.claude/settings.json"),
+            os.path.join(policy.project, ".claude", "settings.json"),
+            os.path.join(policy.project, ".claude", "settings.local.json")]
+
+
+def recommended_settings(policy):
+    hidden = [res for _, res in policy.hidden_roots()]
+
+    def hook(name):
+        return {"type": "command", "command": os.path.join(HOOKS, name), "timeout": 20}
+
+    return {
+        "permissions": {"deny": ["{}(/{}/**)".format(tool, root) for root in hidden for tool in ("Read", "Edit")]},
+        "sandbox": {"enabled": True, "failIfUnavailable": True, "allowUnsandboxedCommands": False,
+                    "excludedCommands": ["phi *", "sbatch *", "squeue *", "sacct *", "scontrol *", "scancel *"],
+                    "filesystem": {"denyRead": hidden}},
+        "hooks": {
+            "PreToolUse": [{"matcher": "Read|Grep|Glob|LS|Edit|MultiEdit|Write|NotebookEdit|Bash",
+                            "hooks": [hook("guard_phi.py")]}],
+            "PostToolUse": [{"matcher": "Read|Grep|Bash", "hooks": [hook("phi_output_scan.py")]}],
+            "UserPromptSubmit": [{"hooks": [hook("guard_phi_prompt.py")]}],
+        },
+    }
+
+
+def merge(into, extra):
+    for key, value in extra.items():
+        if isinstance(value, dict):
+            merge(into.setdefault(key, {}), value)
+        elif isinstance(value, list):
+            have = into.setdefault(key, [])
+            for item in value:
+                if item not in have:
+                    have.append(item)
+        else:
+            into[key] = value
+
+
+def cmd_settings(policy, args):
+    wanted = recommended_settings(policy)
+    if not args.write:
+        print(json.dumps(wanted, indent=2))
+        print("\nMerge this into {} (it names this cluster's paths, so keep it out of git), or rerun "
+              "with --write.".format(settings_files(policy)[2]), file=sys.stderr)
+        return
+    path = settings_files(policy)[2]
+    current = {}
+    if os.path.isfile(path):
+        with open(path, encoding="utf-8") as handle:
+            current = json.load(handle)
+    merge(current, wanted)
+    private_dir(os.path.dirname(path))
+    write_json(path, current)
+    print("wrote {}; restart Claude Code in this project for it to take effect".format(path))
+
+
+def hook_registered(settings, event, script):
+    for group in settings.get("hooks", {}).get(event, []):
+        for hook in group.get("hooks", []):
+            if script in hook.get("command", ""):
+                return True
+    return False
+
+
+def cmd_check(policy, args):
+    rows = []
+
+    def row(ok, what, fix=""):
+        rows.append(("PASS" if ok is True else "WARN" if ok is None else "FAIL", what, fix))
+
+    row(True, "config {}".format(policy.path))
+    for raw, res in zip(policy.raw_protected, policy.protected):
+        row(os.path.isdir(res), "protected folder exists: {}".format(raw), "fix the path in phi.json")
+    for label, path in (("held", policy.held), ("released", policy.released)):
+        exists = os.path.isdir(path)
+        private = exists and (os.stat(path).st_mode & 0o077) == 0
+        row(private if exists else None, "{} area {} is readable by its owner only".format(label, path),
+            "chmod 700 {}".format(path) if exists else "created on first use")
+    inside = phi_policy.is_under(policy.held, policy.project)
+    row(None if inside else True, "held area is outside the project folder",
+        "searches of the whole project are refused while held sits inside it")
+    merged = {}
+    for path in settings_files(policy):
+        if os.path.isfile(path):
+            with open(path, encoding="utf-8") as handle:
+                merge(merged, json.load(handle))
+    for event, script in (("PreToolUse", "guard_phi.py"), ("PostToolUse", "phi_output_scan.py"),
+                          ("UserPromptSubmit", "guard_phi_prompt.py")):
+        row(hook_registered(merged, event, script), "{} hook {} registered".format(event, script),
+            "phi settings --write")
+    deny = merged.get("permissions", {}).get("deny", [])
+    sandbox = merged.get("sandbox", {})
+    deny_read = sandbox.get("filesystem", {}).get("denyRead", [])
+    for raw, res in policy.hidden_roots():
+        row("Read(/{}/**)".format(res) in deny, "Claude's file tools may not read {}".format(raw),
+            "phi settings --write")
+        row(res in deny_read, "sandboxed commands may not read {}".format(raw), "phi settings --write")
+    row(sandbox.get("enabled") is True, "sandbox enabled", "phi settings --write")
+    row(sandbox.get("failIfUnavailable") is True and sandbox.get("allowUnsandboxedCommands") is False,
+        "commands never fall back to running outside the sandbox", "phi settings --write")
+    for tool in ("bwrap", "socat"):
+        row(bool(shutil.which(tool)), "{} installed (the Linux sandbox needs it)".format(tool),
+            "ask the cluster administrators to install {}".format("bubblewrap" if tool == "bwrap" else tool))
+    width = max(len(r[1]) for r in rows)
+    for status, what, fix in rows:
+        print("{}  {}{}".format(status, what.ljust(width), "  -> " + fix if fix and status != "PASS" else ""))
+    if any(r[0] == "FAIL" for r in rows):
+        sys.exit(1)
+
+
+def main():
+    # The system Python on RHEL 8 under LC_ALL=C writes ASCII only; review files and paths may not be.
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace", line_buffering=True)
+    parser = argparse.ArgumentParser(prog="phi", description=__doc__.split("\n\n")[0])
+    sub = parser.add_subparsers(dest="action")
+    sub.add_parser("new").add_argument("name")
+    run = sub.add_parser("run")
+    where = run.add_mutually_exclusive_group()
+    where.add_argument("--into")
+    where.add_argument("--name", default="run")
+    run.add_argument("command", nargs=argparse.REMAINDER)
+    sub.add_parser("collect").add_argument("id")
+    collect = sub.choices["collect"]
+    collect.add_argument("--max-lines", type=int)
+    show = sub.add_parser("show")
+    show.add_argument("id")
+    show.add_argument("--no-tmux", action="store_true")
+    sub.add_parser("release").add_argument("id")
+    reject = sub.add_parser("reject")
+    reject.add_argument("id")
+    reject.add_argument("reason")
+    sub.add_parser("list")
+    sub.add_parser("check")
+    sub.add_parser("settings").add_argument("--write", action="store_true")
+    args = parser.parse_args()
+    if not args.action:
+        parser.print_help()
+        sys.exit(2)
+    os.umask(0o077)
+    globals()["cmd_" + args.action](policy_or_fail(), args)
+
+
+if __name__ == "__main__":
+    main()

@@ -50,6 +50,15 @@ run the hook.
 | `guard_protected_writes.py` | PreToolUse, shell and write tools | a write to a frozen lab notebook; a patient-derived image into `/tmp` or another shared temp directory |
 | `guard_ruff_before_commit.py` | PreToolUse, shell | `git commit` whose staged Python has any ruff finding |
 | `prose_lint.py` | Stop | an outgoing reply containing the padding phrases `CLAUDE.md` bans |
+| `guard_phi.py` | PreToolUse, all tools | in a project with `.claude/phi.json`: reading a protected or held folder, a job log outside the held area, `srun`/`salloc`/`ssh`, an agent-run `phi release` |
+| `phi_output_scan.py` | PostToolUse | nothing; warns when output looks like it holds an identifier |
+| `guard_phi_prompt.py` | UserPromptSubmit | a prompt that looks like pasted data rows |
+
+The three PHI hooks do nothing in a project without `.claude/phi.json`, and
+`phi settings --write` registers them for one project. They are adapted from the
+[CLIF clif-icu plugin](https://github.com/Common-Longitudinal-ICU-data-Format/skills)
+and [kaveriC/clif-sensitive-data-demo](https://github.com/kaveriC/clif-sensitive-data-demo);
+`skills/working-with-phi/README.md` has the rest.
 
 Several are specific to one project: `guard_slurm_submission.py`,
 `guard_protected_writes.py` and `guard_ruff_before_commit.py` all key on a

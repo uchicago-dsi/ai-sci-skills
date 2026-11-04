@@ -28,6 +28,7 @@ Each skill is intentionally compact. The shared versions encode decision rules a
 | `agentcomm` | Let agents coordinate with each other through a shared mailbox |
 | `quota-saving-mode` | Cut the model requests spent on polling, waiting, and status chatter |
 | `humanize` | Edit prose so it sounds like the author and reads plainly |
+| `working-with-phi` | Work on protected health data on a cluster without it entering the session; adapted from the [CLIF clif-icu plugin](https://github.com/Common-Longitudinal-ICU-data-Format/skills) and [kaveriC/clif-sensitive-data-demo](https://github.com/kaveriC/clif-sensitive-data-demo) (credit in its README) |
 
 ### Agents talking to each other
 

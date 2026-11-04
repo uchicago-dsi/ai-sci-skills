@@ -1,0 +1,105 @@
+{
+  "name": "ai-sci-skills",
+  "description": "Skills for AI-assisted scientific research: experiment design, cluster jobs, provenance, records, code, coordination, writing, and protected data.",
+  "owner": {
+    "name": "UChicago Data Science Institute"
+  },
+  "plugins": [
+    {
+      "name": "agentcomm",
+      "source": "./skills/agentcomm"
+    },
+    {
+      "name": "bounded-auto-loop",
+      "source": "./skills/bounded-auto-loop"
+    },
+    {
+      "name": "decision-gates",
+      "source": "./skills/decision-gates"
+    },
+    {
+      "name": "experiment-design",
+      "source": "./skills/experiment-design"
+    },
+    {
+      "name": "handoff",
+      "source": "./skills/handoff"
+    },
+    {
+      "name": "humanize",
+      "source": "./skills/humanize"
+    },
+    {
+      "name": "job-babysitting",
+      "source": "./skills/job-babysitting"
+    },
+    {
+      "name": "lab-notebook",
+      "source": "./skills/lab-notebook"
+    },
+    {
+      "name": "leakage-and-splits",
+      "source": "./skills/leakage-and-splits"
+    },
+    {
+      "name": "maintenance-pass",
+      "source": "./skills/maintenance-pass"
+    },
+    {
+      "name": "mission-control",
+      "source": "./skills/mission-control"
+    },
+    {
+      "name": "paper-structure",
+      "source": "./skills/paper-structure"
+    },
+    {
+      "name": "quarto-presentations",
+      "source": "./skills/quarto-presentations"
+    },
+    {
+      "name": "quota-saving-mode",
+      "source": "./skills/quota-saving-mode"
+    },
+    {
+      "name": "research-code-parsimony",
+      "source": "./skills/research-code-parsimony"
+    },
+    {
+      "name": "run-provenance",
+      "source": "./skills/run-provenance"
+    },
+    {
+      "name": "rut-breaker",
+      "source": "./skills/rut-breaker"
+    },
+    {
+      "name": "sensemaking",
+      "source": "./skills/sensemaking"
+    },
+    {
+      "name": "shared-checkout-git",
+      "source": "./skills/shared-checkout-git"
+    },
+    {
+      "name": "skeptical-labmate",
+      "source": "./skills/skeptical-labmate"
+    },
+    {
+      "name": "slurm",
+      "source": "./skills/slurm"
+    },
+    {
+      "name": "training-audit",
+      "source": "./skills/training-audit"
+    },
+    {
+      "name": "training-run-hygiene",
+      "source": "./skills/training-run-hygiene"
+    },
+    {
+      "name": "working-with-phi",
+      "source": "./skills/working-with-phi"
+    }
+  ]
+}

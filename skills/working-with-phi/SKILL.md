@@ -1,6 +1,6 @@
 ---
 name: working-with-phi
-description: "Work on protected health information (PHI) or other protected data on a shared cluster without it ever entering the session: write and submit code that reads the data, get back only a numeric summary or a file a person has read and released. Use in any project with a .claude/phi.json, whenever a task touches patient data, data folders whose names may identify people, or the logs and outputs of jobs that read them, and when setting up a project to do so."
+description: "Work on protected health information (PHI) or other protected data, on a cluster or a single machine, without it ever entering the session: write and submit code that reads the data, get back only a numeric summary or a file a person has read and released. Use in any project with a .claude/phi.json, whenever a task touches patient data, data folders whose names may identify people, or the logs and outputs of jobs that read them, and when setting up a project to do so."
 ---
 
 # Working with PHI
@@ -17,13 +17,15 @@ and never reword the command to get past it.
 
 ## What you may and may not do
 
-- **Write code that opens protected data.** That is the job. Run it only through
-  `sbatch` or `phi run`, never directly: a script you run yourself prints its
+- **Write code that opens protected data.** That is the job. Run it only as a
+  Slurm job with its log in the held area, or through `phi run`, never directly: a script you run yourself prints its
   output, error messages included, straight into this session, and a `KeyError`
   can quote a patient's name.
 - **Never read, list or search a protected folder or the held area**, with any tool.
   Do not `ls` a data folder to see what is there; ask for the layout instead.
 - **Never use `srun`, `salloc` or `ssh`** to run anything; they stream output back.
+  Other schedulers (PBS `qsub`, LSF `bsub`) are not supported: their logs go
+  where their own options say, which nothing here checks.
 - **Never name a specific patient, exam or file** in a command, a file name or a
   message. Refer to items by position in a list the job builds ("item 3 of the
   sorted manifest") and let the job resolve the position to a path.
@@ -33,16 +35,19 @@ and never reword the command to get past it.
 
 ## Find where the data is
 
-Ask for the layout once per data folder, and again when its layout changes:
+Ask for the layout once per data folder, and again when its layout changes.
+`phi new layout` prints a held folder, such as `/…/held/layout-001`. On a Slurm
+cluster, submit the walk as a job:
 
 ```bash
-phi new layout          # prints the held folder, e.g. /…/held/layout-001
 sbatch --output=/…/held/layout-001/slurm-%j.out <account, partition, time> --cpus-per-task=8 \
   --wrap "phi run --into /…/held/layout-001 -- labdisk layout --out /…/held/layout-001/layout.txt <data folder>..."
 ```
 
 Write the held path out in full in the `sbatch` line; the hook refuses an
-`--output` it cannot resolve, such as `$H/slurm-%j.out`. `labdisk layout`
+`--output` it cannot resolve, such as `$H/slurm-%j.out`. Without Slurm, run
+`phi run --into /…/held/layout-001 -- labdisk layout --out /…/held/layout-001/layout.txt <data folder>...`
+in the background, so a long walk does not hold up the session. `labdisk layout`
 replaces every name with its shape (`9{8}` is eight digits) and merges siblings,
 so a person reviews a few hundred lines. If `labdisk` is not installed, point the
 person to the setup steps in this skill's README. Then collect and show the
@@ -52,9 +57,10 @@ patterns it shows.
 ## Run a job
 
 1. `phi new <name>` makes a held folder and prints its path.
-2. Submit with `--output` (and `--error`, if not merged) inside that folder, and
-   wrap the command in `phi run --into <that folder> --`. Without Slurm, on the
-   node you are on, use `phi run --name <name> -- <command>`.
+2. On a Slurm cluster, submit with `--output` (and `--error`, if not merged)
+   inside that folder, and wrap the command in `phi run --into <that folder> --`.
+   Without Slurm, run `phi run --into <that folder> -- <command>` on this
+   machine, in the background when it will take more than a minute or two.
 3. Make the job quiet. It should print counts, shapes, types and timings, never
    values, paths or names. To pass numbers back without review, the job writes a
    flat JSON object of named numbers to the file named by `$PHI_COUNTS`:

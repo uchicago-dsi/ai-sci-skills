@@ -144,7 +144,8 @@ is placed as one.
 
 A manuscript repeats itself in ways its author cannot see, because the person
 who just wrote a paragraph is the worst-placed reader to notice it restates
-something three thousand words earlier. Use the `redundancy-auditor` subagent,
+something three thousand words earlier. Use the `redundancy-auditor` subagent (each of this skill's subagents carries a
+`paper-structure:` prefix when the skill is installed as a Claude Code plugin),
 which reads the document fresh and returns a claim map: every claim, where it
 appears, and whether each appearance states, previews, restates, interprets or
 bounds it. Redundancy shows up as a claim appearing in a role it should not.

@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Refuse recursive filesystem walks issued from a login node.
 
-A login node is shared with the whole division, and a recursive descent of a
-GPFS tree is metadata traffic that every other person on the node waits behind.
-On 2026-09-22 three agent sessions each started one within an hour and CRI
-raised the possibility of rebooting the node, which would have ended every
-session on it. The written rule did not prevent that, so this checks instead.
+A login node is shared with everyone on the cluster, and a recursive descent of
+a shared filesystem is metadata traffic that every other person on the node
+waits behind. On one cluster, three agent sessions each started one within an
+hour and the administrators considered rebooting the node, which would have
+ended every session on it. A written rule did not prevent that, so this checks.
 
 The hook decides from the command text alone and never touches the filesystem:
 a hook that stats a path can itself hang when the filesystem is the thing in
@@ -13,19 +13,46 @@ trouble, which is exactly when it runs. Paths are resolved lexically against
 the session's working directory so that `find .` inside a GPFS checkout is
 recognised for what it is.
 
-Allowed through: anything on a compute node, anything inside a Slurm job, and
-any walk bounded to depth 3 or less, which covers naming a known layout rather
-than searching for one.
+Allowed through: anything inside a Slurm job, anything on a machine that is not
+a login node, and any walk bounded to depth 3 or less, which covers naming a
+known layout.
+
+Two settings, read from the environment, fit it to a cluster:
+
+- `SLURM_GUARD_LOGIN_HOSTS`, a regular expression matched against the short
+  host name. Without it, any machine with a Slurm client (`sbatch` on `PATH`)
+  counts as a login node whenever it is outside a job.
+- `SLURM_GUARD_SHARED_ROOTS`, the shared filesystems, separated by `:`, such as
+  `/gpfs:/scratch`. Without it, every path counts as shared except local
+  temporary space (`/tmp`, `/var/tmp`, `/dev/shm`, `$TMPDIR`).
 """
 import json
 import os
 import re
 import shlex
+import shutil
 import socket
 import sys
 
-BIG_ROOTS = ("/gpfs", "/ess")
-LOGIN_NODE = re.compile(r"^cri\d+in\d+$")
+SHARED_ROOTS = tuple(r.rstrip("/") for r in os.environ.get("SLURM_GUARD_SHARED_ROOTS", "").split(":") if r)
+LOCAL_ROOTS = tuple(r.rstrip("/") for r in ("/tmp", "/var/tmp", "/dev/shm", os.environ.get("TMPDIR", "")) if r)
+LOGIN_HOSTS = os.environ.get("SLURM_GUARD_LOGIN_HOSTS")
+
+
+def under(path, roots):
+    return any(path == r or path.startswith(r + "/") for r in roots)
+
+
+def is_shared(path):
+    return under(path, SHARED_ROOTS) if SHARED_ROOTS else not under(path, LOCAL_ROOTS)
+
+
+def on_login_node():
+    if os.environ.get("SLURM_JOB_ID"):
+        return False
+    if LOGIN_HOSTS:
+        return bool(re.match(LOGIN_HOSTS, socket.gethostname().split(".")[0]))
+    return shutil.which("sbatch") is not None
 MAX_OK_DEPTH = 3
 SEGMENT_SPLIT = re.compile(r"(?:\|\||&&|[;&|\n])")
 
@@ -85,7 +112,7 @@ def big_tree_targets(tokens, cwd):
         if t.startswith("-"):
             continue
         p = os.path.normpath(t if os.path.isabs(t) else os.path.join(cwd, t))
-        if p.startswith(BIG_ROOTS):
+        if is_shared(p):
             hits.append(p)
     return hits
 
@@ -139,7 +166,7 @@ def verdict(command, cwd):
                 return f"`{verb}` with ignore rules disabled walks every file under the target"
 
     if INLINE_WALK.search(command) and (
-            any(r in command for r in BIG_ROOTS) or cwd.startswith(BIG_ROOTS)):
+            (SHARED_ROOTS and any(r in command for r in SHARED_ROOTS)) or is_shared(cwd)):
         return "inline code walks a tree with os.walk, rglob or a ** glob"
     return None
 
@@ -151,9 +178,7 @@ def main():
         sys.exit(0)
     if payload.get("tool_name") != "Bash":
         sys.exit(0)
-    if os.environ.get("SLURM_JOB_ID"):
-        sys.exit(0)
-    if not LOGIN_NODE.match(socket.gethostname().split(".")[0]):
+    if not on_login_node():
         sys.exit(0)
 
     command = (payload.get("tool_input") or {}).get("command", "")
@@ -165,17 +190,15 @@ def main():
     print(
         f"Refused on {socket.gethostname().split('.')[0]}, a shared login node: {reason}.\n"
         "\n"
-        "This node carries everyone's interactive sessions, and a GPFS tree descent is "
-        "metadata traffic they all queue behind. Pick one:\n"
+        "This node carries everyone's interactive sessions, and a descent of a shared "
+        "filesystem is metadata traffic they all queue behind. Pick one:\n"
         "  - Read the manifest, census or receipt file the producer already wrote. This "
         "is almost always the right answer and it is also the fast one.\n"
         "  - Bound the walk to depth 3 or less by naming the layout you expect.\n"
-        "  - Submit it to Slurm from a pinned worktree if it genuinely must enumerate "
-        "a large tree.\n"
+        "  - Submit it as a Slurm job if it genuinely must enumerate a large tree.\n"
         "\n"
-        "The rule is in AGENTS.md under Compute And Slurm. Do not work around this hook "
-        "by renaming the command or splitting it up; if none of the three options fit, "
-        "ask Anna.",
+        "Do not work around this hook by renaming the command or splitting it up; if "
+        "none of the three options fit, ask the person you work with.",
         file=sys.stderr,
     )
     sys.exit(2)

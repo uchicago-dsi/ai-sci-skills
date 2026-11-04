@@ -380,7 +380,19 @@ def settings_files(policy):
             os.path.join(policy.project, ".claude", "settings.local.json")]
 
 
-def recommended_settings(policy):
+HOOK_SCRIPTS = ("guard_phi.py", "phi_output_scan.py", "guard_phi_prompt.py")
+
+
+def plugin_enabled(policy):
+    """True when the working-with-phi Claude Code plugin is on, which registers the hooks itself."""
+    for path in settings_files(policy):
+        for key, on in read_settings(path).get("enabledPlugins", {}).items():
+            if key.startswith("working-with-phi@") and on:
+                return True
+    return False
+
+
+def recommended_settings(policy, with_hooks):
     hidden = [res for _, res in policy.hidden_roots()]
 
     def hook(name):
@@ -396,8 +408,21 @@ def recommended_settings(policy):
                             "hooks": [hook("guard_phi.py")]}],
             "PostToolUse": [{"matcher": "Read|Grep|Bash", "hooks": [hook("phi_output_scan.py")]}],
             "UserPromptSubmit": [{"hooks": [hook("guard_phi_prompt.py")]}],
-        },
+        } if with_hooks else {},
     }
+
+
+def drop_phi_hooks(settings):
+    """Remove this skill's hook entries, wherever they pointed, so a moved install leaves none stale."""
+    for event, groups in list(settings.get("hooks", {}).items()):
+        kept = []
+        for group in groups:
+            group["hooks"] = [h for h in group.get("hooks", [])
+                              if not any(name in h.get("command", "") + " ".join(h.get("args", []))
+                                         for name in HOOK_SCRIPTS)]
+            if group["hooks"]:
+                kept.append(group)
+        settings["hooks"][event] = kept
 
 
 def merge(into, extra):
@@ -423,7 +448,9 @@ def read_settings(path):
 def write_settings(policy):
     path = settings_files(policy)[2]
     current = read_settings(path)
-    merge(current, recommended_settings(policy))
+    drop_phi_hooks(current)
+    merge(current, recommended_settings(policy, with_hooks=not plugin_enabled(policy)))
+    current["hooks"] = {event: groups for event, groups in current.get("hooks", {}).items() if groups}
     private_dir(os.path.dirname(path))
     write_json(path, current)
     return path
@@ -431,7 +458,7 @@ def write_settings(policy):
 
 def cmd_settings(policy, args):
     if not args.write:
-        print(json.dumps(recommended_settings(policy), indent=2))
+        print(json.dumps(recommended_settings(policy, with_hooks=not plugin_enabled(policy)), indent=2))
         print("\nMerge this into {} (it names this cluster's paths, so keep it out of git), or rerun "
               "with --write.".format(settings_files(policy)[2]), file=sys.stderr)
         return
@@ -531,9 +558,11 @@ def cmd_check(policy, args):
         if os.path.isfile(path):
             with open(path, encoding="utf-8") as handle:
                 merge(merged, json.load(handle))
+    from_plugin = plugin_enabled(policy)
     for event, script in (("PreToolUse", "guard_phi.py"), ("PostToolUse", "phi_output_scan.py"),
                           ("UserPromptSubmit", "guard_phi_prompt.py")):
-        row(hook_registered(merged, event, script), "{} hook {} registered".format(event, script),
+        row(from_plugin or hook_registered(merged, event, script),
+            "{} hook {} registered{}".format(event, script, " (by the plugin)" if from_plugin else ""),
             "phi settings --write")
     deny = merged.get("permissions", {}).get("deny", [])
     sandbox = merged.get("sandbox", {})
@@ -545,9 +574,14 @@ def cmd_check(policy, args):
     row(sandbox.get("enabled") is True, "sandbox enabled", "phi settings --write")
     row(sandbox.get("failIfUnavailable") is True and sandbox.get("allowUnsandboxedCommands") is False,
         "commands never fall back to running outside the sandbox", "phi settings --write")
-    for tool in ("bwrap", "socat"):
-        row(bool(shutil.which(tool)), "{} installed (the Linux sandbox needs it)".format(tool),
-            "ask the cluster administrators to install {}".format("bubblewrap" if tool == "bwrap" else tool))
+    if sys.platform.startswith("linux"):
+        for tool in ("bwrap", "socat"):
+            row(bool(shutil.which(tool)), "{} installed (the Linux sandbox needs it)".format(tool),
+                "ask the administrators to install {}".format("bubblewrap" if tool == "bwrap" else tool))
+    elif sys.platform == "darwin":
+        row(True, "sandbox built into macOS")
+    else:
+        row(False, "Claude Code's sandbox runs on Linux and macOS only", "use Linux, macOS or WSL2")
     width = max(len(r[1]) for r in rows)
     for status, what, fix in rows:
         print("{}  {}{}".format(status, what.ljust(width), "  -> " + fix if fix and status != "PASS" else ""))

@@ -1,7 +1,7 @@
 # working-with-phi
 
-Lets a coding agent work on protected health information on a shared cluster
-without the data entering its session. The agent writes and submits the code
+Lets a coding agent work on protected health information, on a Slurm cluster or
+on a single machine, without the data entering its session. The agent writes and submits the code
 that reads the data. What comes back is either a numeric summary, released
 automatically, or a file you have read and released.
 
@@ -34,11 +34,17 @@ sandbox also stops any script the agent runs directly from opening them.
 You need, once:
 
 - **The skill and its commands.** Installing ai-sci-skills by asking your agent
-  to follow the repository's `INSTALL.md` covers this: it links the `phi`
-  command onto your `PATH` and installs
+  to follow the repository's `INSTALL.md` covers this: it installs the skill
+  (in Claude Code, as a plugin, which also turns on its hooks), links the `phi`
+  command onto your `PATH` for you to run in your own terminal, and installs
   [labdisk](https://github.com/annawoodard/labdisk), which summarizes data
-  folders. To install labdisk by hand on RHEL 8, where `python3.11` comes
-  without pip:
+  folders. The plugin on its own:
+
+  ```
+  /plugin install working-with-phi --marketplace uchicago-dsi/ai-sci-skills
+  ```
+
+  To install labdisk by hand on RHEL 8, where `python3.11` comes without pip:
 
   ```
   python3.11 -m venv ~/.local/share/labdisk-env
@@ -46,11 +52,12 @@ You need, once:
   ln -s ~/.local/share/labdisk-env/bin/labdisk ~/.local/bin/labdisk
   ```
 
-- **`bubblewrap` and `socat` on the cluster.** The sandbox is built on these two
+- **On Linux, `bubblewrap` and `socat`.** The sandbox is built on these two
   system packages: `bubblewrap` runs a command inside a restricted view of the
   filesystem, and `socat` carries the command's network traffic across that
-  boundary. They must be on every node where you run Claude Code. If either is
-  missing, ask the cluster's administrators to install it.
+  boundary. On a cluster they must be on every node where you run Claude Code;
+  if either is missing, ask the administrators to install it. On macOS the
+  sandbox is built in and needs nothing. Windows needs WSL2.
 - **tmux**, optionally. With it, review files open in a pane beside the agent's.
 
 ## Step 1: set up the project
@@ -89,7 +96,7 @@ list, so a refusal can never be worked around by un-protecting something.
 Ask for what you want, for example `Count the exams in each patient folder.`
 
 The first time, the agent doesn't know how the data is laid out, so it first
-submits a job that runs `labdisk layout` on the data folders. That writes a
+runs `labdisk layout` on the data folders, as a Slurm job where there is one. That writes a
 summary in which every name is replaced by its shape (`9{8}` means eight
 digits, `A{5}` five capital letters) and folders with the same shape are merged
 into one line. Only names that recur in many folders, such as `DICOM`, appear
@@ -125,8 +132,9 @@ one review file and asks you to read it.
 
 ## Day to day
 
-- **While a job runs, you do nothing.** The agent submits it through Slurm with
-  its log in the held area.
+- **While a job runs, you do nothing.** On a Slurm cluster the agent submits
+  it as a job with its log in the held area; elsewhere it runs it with
+  `phi run`, which sends every line of output there.
 - **When a job fails, you usually do nothing either.** Each job leaves a
   numeric summary that is released without review: the exit code, line counts,
   any counts the job recorded, and for a Python error the error's type and the
@@ -154,6 +162,7 @@ Things to avoid:
 | Output scan | `hooks/phi_output_scan.py` | after a tool call, warns when output looks like it holds an identifier |
 | Pasted rows | `hooks/guard_phi_prompt.py` | drops a prompt that looks like pasted data rows |
 | Policy | `hooks/phi_policy.py` | reads the project's `.claude/phi.json`; shared by all of the above |
+| Plugin hooks | `hooks/hooks.json` | turns the three hooks on when the skill is installed as a Claude Code plugin; they do nothing in a project without `.claude/phi.json` |
 | Layout | `labdisk layout` | summarizes data folders with every name replaced by its shape |
 
 `.claude/phi.json` has three required fields, `protected` (a list of folders),
@@ -176,6 +185,8 @@ with no packages. `labdisk layout` needs Python 3.11 or newer.
 - This setup stops accidents by an agent that is trying to follow the rules.
   An agent working against them could, for example, submit a job that copies
   data into the released area.
+- Slurm is the only scheduler it checks. Jobs submitted to another scheduler
+  (PBS `qsub`, LSF `bsub`) write their logs wherever their own options say.
 - The hooks see each command as typed. A script the agent runs directly, which
   opens a protected folder without naming it on the command line, is stopped
   only by the sandbox.

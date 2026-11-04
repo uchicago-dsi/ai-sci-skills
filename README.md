@@ -21,10 +21,12 @@ Install the skills from https://github.com/uchicago-dsi/ai-sci-skills for
 yourself, following its INSTALL.md.
 ```
 
-[`INSTALL.md`](INSTALL.md) tells the agent where its skills go, links the
-skills and the commands in `bin/`, finishes the setup of the few skills that
-need more, and asks before changing your shell profile, scheduled jobs or agent
-settings. Restart the agent session afterwards.
+Add "only slurm and sensemaking", or similar, to install some of them.
+[`INSTALL.md`](INSTALL.md) tells the agent where skills go, installs each
+chosen skill with its own commands and helper agents (as plugins, for Claude
+Code), finishes the setup of the few skills that need more, and asks before
+changing your shell profile, scheduled jobs or agent settings. Restart the
+agent session afterwards.
 
 To install by hand, follow [`INSTALL.md`](INSTALL.md) yourself.
 
@@ -141,15 +143,22 @@ skills that matter there and when to reach for them:
 Don't copy a skill's body into `AGENTS.md`. The project file says when; the
 skill says how.
 
-`hooks/` holds optional guards that refuse a tool call which would break a
-rule, and say why; [`hooks/README.md`](hooks/README.md) explains how to wire
-them into Claude Code or Codex.
+Some skills ship hooks: checks the agent runs before or after an action, which
+refuse one that would break a rule and say why.
+[`hooks/README.md`](hooks/README.md) lists them and says how to turn them on.
 
 ## Contributing
 
 New general-purpose skills, tighter wording, examples for more agents, bug
 fixes and clearer guidance are all welcome. Keep skills compact and reusable,
 and keep facts about one site or lab out of the shared skill body.
+
+A skill is one folder under `skills/`: its `SKILL.md`, and any commands
+(`bin/`), Claude Code helper agents (`agents/`) or hooks (`hooks/`) it needs,
+so installing the folder installs all of it. Add a new skill to
+[`.claude-plugin/marketplace.json`](.claude-plugin/marketplace.json) as well,
+so Claude Code can install it as a plugin, and check the file with
+`claude plugin validate .`.
 
 Some skills adapt other projects' work;
 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) credits them.

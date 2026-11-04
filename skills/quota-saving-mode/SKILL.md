@@ -79,7 +79,7 @@ scripts below only for a wake-up the harness cannot see, such as a Slurm job it
 is not tracking.
 
 Codex has no equivalent, so it needs an out-of-process watcher. `await-notify`
-and `await-event` ship in this repository's `bin/` for that case.
+and `await-event` ship in this skill's `bin/` for that case.
 
 `await-notify` registers that watcher. It returns immediately with a receipt
 and the waiting happens in a detached process:

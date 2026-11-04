@@ -12,7 +12,7 @@ lets them coordinate.
 
 `quota-saving-mode` uses the mailbox for the same reason, to deliver a wake-up
 when a long job finishes so an agent doesn't poll for it. That skill ships
-`bin/await-notify` and `bin/await-event` for harnesses without built-in
+`await-notify` and `await-event` in its `bin/` for harnesses without built-in
 background notification; Claude Code has its own and doesn't need them.
 
 ## Where to read next

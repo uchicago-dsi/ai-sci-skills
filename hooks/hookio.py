@@ -18,6 +18,9 @@ refusal that only says no gets worked around.
 
 import json
 import os
+import re
+import shlex
+import subprocess
 import sys
 
 # Written for the oldest interpreter a hook may be handed. A user-level hook
@@ -103,3 +106,75 @@ def write_targets(event):
         if isinstance(value, str) and value:
             found.append(value)
     return found
+
+
+# Helpers for guards that act on `git commit`: is this command a commit, and
+# what does the staged change add.
+ASSIGNMENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
+PREFIXES = ("sudo", "exec", "time", "nohup", "env", "command", "builtin")
+
+
+def commits(command):
+    """True when this command line actually runs `git commit`."""
+    for segment in re.split(r"(?:\|\||&&|[;&|\n])", command):
+        if "<<" in segment:
+            break
+        try:
+            words = shlex.split(segment)
+        except ValueError:
+            words = segment.split()
+        while words and (ASSIGNMENT.match(words[0]) or words[0] in PREFIXES):
+            words.pop(0)
+        if not words or os.path.basename(words[0]) != "git":
+            continue
+        # Skip git's own options to reach the subcommand: `git -C path commit`.
+        rest = words[1:]
+        while rest and rest[0].startswith("-"):
+            rest.pop(0)
+            if rest and not rest[0].startswith("-"):
+                rest.pop(0)
+        if rest and rest[0] == "commit":
+            return True
+    return False
+
+
+def run(arguments, cwd=None, timeout=60):
+    """One bounded subprocess as (exit status, output), or None when it cannot be run."""
+    try:
+        done = subprocess.run(arguments, stdout=subprocess.PIPE,
+                              stderr=subprocess.STDOUT, timeout=timeout, cwd=cwd)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    return done.returncode, done.stdout.decode("utf-8", "replace")
+
+
+def added_lines(toplevel):
+    """{path: set of 1-based line numbers the staged diff adds}."""
+    result = run(["git", "-C", toplevel, "diff", "--cached", "--unified=0",
+                  "--no-color", "--diff-filter=ACMR"], timeout=30)
+    if not result or result[0] != 0:
+        return {}
+    added, path, line = {}, None, 0
+    for text in result[1].splitlines():
+        if text.startswith("+++ "):
+            path = text[6:] if text.startswith("+++ b/") else None
+            continue
+        hunk = re.match(r"@@ -\S+ \+(\d+)(?:,(\d+))? @@", text)
+        if hunk:
+            line = int(hunk.group(1))
+            continue
+        if path and text.startswith("+") and not text.startswith("+++"):
+            added.setdefault(path, set()).add(line)
+            line += 1
+    return added
+
+
+def staged_text(toplevel, path):
+    """The staged content of one file, or None."""
+    try:
+        done = subprocess.run(["git", "-C", toplevel, "show", ":" + path],
+                              stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                              timeout=30)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    return done.stdout.decode("utf-8", "replace") if done.returncode == 0 else None

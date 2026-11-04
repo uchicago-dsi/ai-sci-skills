@@ -1,6 +1,6 @@
 """Find British spellings in text meant for a reader, and name the American form.
 
-Anna writes American English. British forms come back on their own: from
+For writing in American English. British forms come back on their own: from
 quoted sources, from earlier drafts, from figure labels copied between
 scripts, and from agents whose training leans British. Fixing them by hand
 each time has not held, so the commit guard refuses on this list. Chat replies

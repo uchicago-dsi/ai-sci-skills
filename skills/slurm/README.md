@@ -17,3 +17,19 @@ QoS, account defaults, and the repo's launcher/env convention. Then write a
 short local Slurm site note in docs/slurm-site.md with only the durable facts
 that change launch decisions.
 ```
+
+## Login-node guard
+
+`hooks/block_login_node_walks.py` refuses a recursive `find`, `rg`, `du`,
+`ls -R` or `os.walk` over a shared filesystem when the agent is on a login node,
+where that traffic slows everyone's sessions. A walk limited to three levels
+passes, and so does anything inside a Slurm job. It is off until you turn it on;
+[`../../hooks/README.md`](../../hooks/README.md) says how.
+
+Two environment variables fit it to a cluster, for example in the `env` block of
+`~/.claude/settings.json`:
+
+| Variable | Meaning | Without it |
+| --- | --- | --- |
+| `SLURM_GUARD_LOGIN_HOSTS` | a regular expression matching login nodes' short host names | any machine with `sbatch` counts as a login node while outside a job |
+| `SLURM_GUARD_SHARED_ROOTS` | the shared filesystems, separated by `:`, such as `/gpfs:/scratch` | every path counts as shared except `/tmp`, `/var/tmp`, `/dev/shm` and `$TMPDIR` |

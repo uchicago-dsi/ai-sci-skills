@@ -236,7 +236,8 @@ verbatim quotations or literal prompts unless the user includes them explicitly.
    worker the cross-agent rubric in `agents/humanize-auditor.md`,
    the exact target, the audience, **the register you resolved**, and any
    voice guidance; in Claude Code that
-   rubric is the `humanize-auditor` subagent. Ask for high-confidence, actionable
+   rubric is the `humanize-auditor` subagent (`humanize:humanize-auditor` when
+   this skill is installed as a plugin). Ask for high-confidence, actionable
    findings in both registers: machine phrasing and unearned jargon. Apply the
    rubric directly when delegation is unavailable.
 2. Review the findings yourself. Ignore anything that flattens the author's

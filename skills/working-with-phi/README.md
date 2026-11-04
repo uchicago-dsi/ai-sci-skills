@@ -3,103 +3,169 @@
 Lets a coding agent work on protected health information on a shared cluster
 without the data entering its session. The agent writes and submits the code
 that reads the data. What comes back is either a numeric summary, released
-automatically, or a file a person has read and released.
+automatically, or a file you have read and released.
 
 The usual alternative is to develop on synthetic data and have a person run the
 real thing. Here the agent debugs on the real data, through jobs whose output it
 can't see. Building a faithful synthetic copy costs about as much as that
 debugging.
 
-Claude Code only for now. Claude Code runs checks before and after each agent
-action (its hooks); the checks here go through one helper, `hooks/hookio.py`,
-so Codex can be added once its sandbox has been checked.
+Claude Code only for now.
 
-## Parts
+## How it works
+
+Three places on disk matter:
+
+| Place | What is there | Can the agent read it? |
+| --- | --- | --- |
+| Protected folders | your data | no |
+| Held area | everything a job prints or saves | no |
+| Released area | what you have read and let through, plus each job's numeric summary | yes |
+
+The agent writes jobs, submits them, and reads only the released area.
+Before each tool call, Claude Code runs a check (a hook) that refuses any
+command reading a protected folder or the held area. An operating-system
+sandbox also stops any script the agent runs directly from opening them.
+
+## Before you start
+
+You need, once:
+
+- **The skill and its commands.** Installing ai-sci-skills by asking your agent
+  to follow the repository's `INSTALL.md` covers this: it links the `phi`
+  command onto your `PATH` and installs
+  [labdisk](https://github.com/annawoodard/labdisk), which summarizes data
+  folders. To install labdisk by hand on RHEL 8, where `python3.11` comes
+  without pip:
+
+  ```
+  python3.11 -m venv ~/.local/share/labdisk-env
+  ~/.local/share/labdisk-env/bin/pip install git+https://github.com/annawoodard/labdisk
+  ln -s ~/.local/share/labdisk-env/bin/labdisk ~/.local/bin/labdisk
+  ```
+
+- **`bubblewrap` and `socat` on the cluster.** The sandbox is built on these two
+  system packages: `bubblewrap` runs a command inside a restricted view of the
+  filesystem, and `socat` carries the command's network traffic across that
+  boundary. They must be on every node where you run Claude Code. If either is
+  missing, ask the cluster's administrators to install it.
+- **tmux**, optionally. With it, review files open in a pane beside the agent's.
+
+## Step 1: set up the project
+
+Do this once per project.
+
+1. Start Claude Code in the project and tell it where the data is, naming only
+   the top-level data folders:
+
+   ```
+   Set up working-with-phi for this project. The protected data is in
+   /path/to/data and /path/to/more/data.
+   ```
+
+   Never paste file or folder names from inside those folders; they may
+   identify people.
+2. The agent asks where to keep the held and released areas. Pick a place
+   outside the project folder that only you can read, for example your scratch
+   space. It then writes `.claude/phi.json`, runs `phi settings --write` to add
+   the hooks, the sandbox and the read restrictions to
+   `.claude/settings.local.json`, and adds a line to the project's `CLAUDE.md`
+   saying the project holds protected data.
+3. Quit Claude Code and start it again in the project, so the new settings
+   apply. If it refuses to start with "sandbox required but unavailable",
+   `bubblewrap` or `socat` is missing; it will not run without the sandbox.
+4. Ask the agent to run `phi check`. Every row should say `PASS`.
+
+From then on, `.claude/phi.json` is yours to change; the agent's file-editing
+tools are refused there. To add a data folder later, edit it yourself and run
+`phi settings --write` again.
+
+## Step 2: give the agent a task
+
+Ask for what you want, for example `Count the exams in each patient folder.`
+
+The first time, the agent doesn't know how the data is laid out, so it first
+submits a job that runs `labdisk layout` on the data folders. That writes a
+summary in which every name is replaced by its shape (`9{8}` means eight
+digits, `A{5}` five capital letters) and folders with the same shape are merged
+into one line. Only names that recur in many folders, such as `DICOM`, appear
+as written. When the job finishes, the agent asks you to review the summary,
+which is step 3.
+
+## Step 3: review and release
+
+Every time the agent needs to see something a job printed or saved, it builds
+one review file and asks you to read it.
+
+1. **Open it.** In tmux, the file opens in a new pane beside the agent's.
+   Without tmux, the agent gives you a path; open it in your own terminal or
+   editor. Don't open it through the agent (`!less`, `!cat`): a `!` command's
+   output goes to the model.
+2. **Read all of it.** The top lists the files it contains and any lines that
+   look like identifiers (record numbers, Social Security numbers, birth dates,
+   and any patterns the project adds); start there.
+3. **Cut what must not reach the agent.** Edit the file and save it. In the
+   tmux pane, press `v` to open it in your editor.
+4. **Release or reject it.** Run one of these in your own terminal, or in the
+   agent's session by typing `!` as the very first character of the prompt (a
+   space before the `!` sends the line to the agent as a message instead):
+
+   ```
+   !phi release layout-001
+   !phi reject layout-001 "line 40 prints a folder name"
+   ```
+
+   Release copies the file, as you left it, to the released area, where the
+   agent can read it. Reject gives the agent your reason and nothing else.
+5. **Tell the agent to carry on**, if you released from your own terminal.
+
+## Day to day
+
+- **While a job runs, you do nothing.** The agent submits it through Slurm with
+  its log in the held area.
+- **When a job fails, you usually do nothing either.** Each job leaves a
+  numeric summary that is released without review: the exit code, line counts,
+  any counts the job recorded, and for a Python error the error's type and the
+  file and line in the project where it happened. The error's message, which is
+  where values appear, stays held. That is usually enough for the agent to fix
+  the code.
+- **When it needs more, it asks for a review**, and you repeat step 3.
+
+Things to avoid:
+
+- Pasting data, file names or job output into the prompt. A prompt that looks
+  like pasted rows is dropped before the agent sees it, but the text can still
+  be saved in the session's local history.
+- Viewing held files with `!` commands.
+- Asking the agent to work around a refusal. Each refusal says what to do
+  instead.
+
+## Reference
 
 | Part | Where | What it does |
 | --- | --- | --- |
 | The skill | `SKILL.md` | the workflow the agent follows |
-| `phi` | `bin/phi` | runs work blind, builds review files, opens them for a person, releases them, checks setup |
+| `phi` | `bin/phi` | runs work blind, builds review files, opens them for you, releases them, checks setup |
 | Guard | `hooks/guard_phi.py` | before each tool call, refuses reads of protected or held folders, job logs outside the held area, `srun`/`salloc`/`ssh`, and agent-run releases |
 | Output scan | `hooks/phi_output_scan.py` | after a tool call, warns when output looks like it holds an identifier |
-| Pasted rows | `hooks/guard_phi_prompt.py` | drops a prompt that looks like pasted data rows before the model sees it |
+| Pasted rows | `hooks/guard_phi_prompt.py` | drops a prompt that looks like pasted data rows |
 | Policy | `hooks/phi_policy.py` | reads the project's `.claude/phi.json`; shared by all of the above |
-| Layout | `labdisk layout`, in [labdisk](https://github.com/annawoodard/labdisk) | summarizes data folders with every name replaced by its shape |
+| Layout | `labdisk layout` | summarizes data folders with every name replaced by its shape |
+
+`.claude/phi.json` has three required fields, `protected` (a list of folders),
+`held` and `released`. Optional fields: `identifier_patterns` (name to regular
+expression, for a site's own accession or study numbers), `key_columns` (extra
+column names the pasted-rows check looks for) and `max_review_lines` (default
+5,000).
+
+Each job gets a folder, `<id>`, in both areas. In the released area, `receipt.json`
+records who released the review, when, and its checksum, and `decisions.jsonl`
+lists every release and rejection in order. The latest decision stands:
+rejecting a review you released earlier removes the released copy, though the
+agent may already have read it.
 
 Everything except `labdisk layout` runs on the system Python 3 (3.6 on RHEL 8)
-with no packages. `labdisk layout` needs Python 3.11 or newer; on RHEL 8 that is
-`python3.11`, installed beside the system Python.
-
-## Setting up
-
-1. Link `bin/phi` onto your `PATH`, for example
-   `ln -s ~/ai-sci-skills/bin/phi ~/.local/bin/phi`, and install labdisk. On
-   RHEL 8 `python3.11` comes without pip, so give labdisk an environment of its
-   own:
-
-   ```
-   python3.11 -m venv ~/.local/share/labdisk-env
-   ~/.local/share/labdisk-env/bin/pip install git+https://github.com/annawoodard/labdisk
-   ln -s ~/.local/share/labdisk-env/bin/labdisk ~/.local/bin/labdisk
-   ```
-2. In the project, write `.claude/phi.json`:
-
-   ```json
-   {
-     "protected": ["/path/to/data", "/path/to/more/data"],
-     "held": "/path/outside/the/project/phi/held",
-     "released": "/path/outside/the/project/phi/released"
-   }
-   ```
-
-   Optional fields: `identifier_patterns` (name to regular expression, for a
-   site's own accession or study numbers), `key_columns` (extra column names the
-   pasted-rows check looks for) and `max_review_lines` (default 5,000).
-3. Run `phi settings --write`. It adds three things to
-   `.claude/settings.local.json`: the three hooks; rules that deny Claude's file
-   tools any read of the protected and held folders; and the operating-system
-   sandbox, which stops a command the agent runs directly from opening those
-   folders, even one that doesn't name them. Job submission and `phi` run outside
-   the sandbox, since their output goes to the held area. The settings file is
-   not committed, because it names this cluster's paths. Restart Claude Code in
-   the project.
-4. Run `phi check`. Every row must pass. On Linux the sandbox is built on two
-   system packages: `bubblewrap`, which runs a command inside a restricted view
-   of the filesystem, and `socat`, which carries the command's network traffic
-   across that boundary. If either is missing, ask the cluster's administrators
-   to install it. Until both are there, Claude Code refuses to start in the
-   project, which is deliberate: it never runs without the sandbox.
-
-## How a person reviews output
-
-When the agent needs to see what a job printed or saved, it runs `phi collect`
-and `phi show`. There are two ways to read the result:
-
-- **In tmux**: `phi show` opens the review file in a new pane beside the
-  agent's. The text goes to your terminal; nothing from it comes back to the
-  agent. Press `q` to close the pane.
-- **Without tmux**: `phi show` prints the file's path. Open it in your own
-  terminal or editor, outside the agent's session.
-
-Either way, delete anything that must not reach the agent, save, and run
-`phi release <id>` or `phi reject <id> "reason"`. Run it in your own terminal,
-or in the agent's session by typing `!` as the very first character of the
-prompt (`!phi release <id>`; a space before the `!` sends the line to the agent
-as a message instead). Commands typed with `!` skip the hooks that stop the
-agent from releasing, and release prints only the id, the line count and the
-released path, so nothing from the file enters the conversation.
-
-Release copies the file as you left it into the released area, with a receipt
-saying who released it, when, and its checksum. The latest decision stands:
-rejecting a review you released earlier removes the released copy. Every
-decision is also appended to `decisions.jsonl` beside it, so a withdrawn release
-stays on record.
-
-Don't view held files through the agent's prompt. A `!` command's output goes
-to the model, so `!less` or `!cat` on a held file sends it there. A message a
-hook shows to you alone is no better: it is still written to the session
-transcript, which is stored on Anthropic's servers while Remote Control
-(following or continuing the session from claude.ai or a phone) is connected.
+with no packages. `labdisk layout` needs Python 3.11 or newer.
 
 ## Limits
 
@@ -112,8 +178,10 @@ transcript, which is stored on Anthropic's servers while Remote Control
 - The automatic summary holds only numbers, each under a name the job chose. A
   count that is really an identifier would pass; the fixed set of fields makes
   that unlikely, not impossible.
-- A blocked prompt can still be stored in the local transcript and prompt
-  history.
+- A message a hook shows to you alone is still written to the session
+  transcript, which is stored on Anthropic's servers while Remote Control
+  (following or continuing the session from claude.ai or a phone) is
+  connected. Nothing here routes protected data through such messages.
 
 ## Credit
 

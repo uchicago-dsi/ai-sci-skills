@@ -84,11 +84,20 @@ When you need what a job printed or saved:
 
 ## Set up a project
 
-1. Write `.claude/phi.json` with the data folders, a held area and a released area,
-   both outside the project folder (see `hooks/phi_policy.py` for every field).
-2. `phi settings --write` adds the hooks, the read-deny rules and the sandbox to
-   `.claude/settings.local.json`. Restart Claude Code in the project.
-3. `phi check` must pass every row. It reads no data.
+When the person asks you to set up a project, they name the top-level data
+folders. Until setup is finished nothing guards them, so do not list, search or
+open those folders to check them; `phi check` confirms they exist.
+
+1. Ask where the held and released areas should go: outside the project folder,
+   readable only by the person, such as their scratch space.
+2. Write `.claude/phi.json` with `protected` (the data folders), `held` and
+   `released` (see `hooks/phi_policy.py` for the optional fields).
+3. Run `phi settings --write`. It adds the hooks, the read-deny rules and the
+   sandbox to `.claude/settings.local.json`.
+4. Add one line to the project's `CLAUDE.md`: this project holds protected data;
+   follow the `working-with-phi` skill.
+5. Ask the person to quit and restart Claude Code in the project, then run
+   `phi check`. Every row must pass; report any that do not. It reads no data.
 
 ## What this does not stop
 

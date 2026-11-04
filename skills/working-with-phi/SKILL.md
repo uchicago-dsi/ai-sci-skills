@@ -73,11 +73,12 @@ When you need what a job printed or saved:
    which shows the file without anything from it coming back to you. Without tmux
    it prints the path for the person to open in their own terminal or editor.
 3. Stop and tell the person what you asked for and why. Do not poll.
-4. They run `phi release <id>` or `phi reject <id> "reason"`. Read
+4. They run `phi release <id>` or `phi reject <id> "reason"`, in their own terminal
+   or here as `!phi release <id>` (the `!` must be the first character). Read
    `<released>/<id>/review.txt` or `rejected.json`. They may have cut lines; the
    released file is what you have. The latest decision stands: if a
    review you already read is later rejected, its file disappears, and you stop
-   using anything you took from it.
+   using anything you took from it. `decisions.jsonl` beside it lists every decision.
 
 ## Set up a project
 

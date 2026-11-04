@@ -316,12 +316,21 @@ def cmd_release(policy, args):
     rejected = os.path.join(target, "rejected.json")
     if os.path.exists(rejected):
         os.unlink(rejected)
-    write_json(os.path.join(target, "receipt.json"), {
-        "id": args.id, "released_by": getpass.getuser(),
-        "released_at": datetime.datetime.now().astimezone().isoformat(timespec="seconds"),
-        "files": copied, "sha256": digest.hexdigest(), "lines": line_count(review)})
+    receipt = {"id": args.id, "released_by": getpass.getuser(),
+               "released_at": datetime.datetime.now().astimezone().isoformat(timespec="seconds"),
+               "files": copied, "sha256": digest.hexdigest(), "lines": line_count(review)}
+    write_json(os.path.join(target, "receipt.json"), receipt)
+    log_decision(target, dict(receipt, decision="release"))
     print("released {} ({:,} lines). The agent can now read {}".format(args.id, line_count(review),
                                                                        os.path.join(target, "review.txt")))
+
+
+def log_decision(target, record):
+    """Append to the review's decision history, which is never rewritten, so a release that a
+    later rejection withdrew stays on record even after further decisions."""
+    fd = os.open(os.path.join(target, "decisions.jsonl"), os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
+    with os.fdopen(fd, "a", encoding="utf-8") as handle:
+        handle.write(json.dumps(record, sort_keys=True) + "\n")
 
 
 def cmd_reject(policy, args):
@@ -331,10 +340,11 @@ def cmd_reject(policy, args):
     withdrawn = [n for n in REVIEW_FILES + ("receipt.json",) if os.path.isfile(os.path.join(target, n))]
     for name in withdrawn:
         os.unlink(os.path.join(target, name))
-    write_json(os.path.join(target, "rejected.json"), {
-        "id": args.id, "rejected_by": getpass.getuser(), "reason": args.reason,
-        "rejected_at": datetime.datetime.now().astimezone().isoformat(timespec="seconds"),
-        "withdrew_release": bool(withdrawn)})
+    record = {"id": args.id, "rejected_by": getpass.getuser(), "reason": args.reason,
+              "rejected_at": datetime.datetime.now().astimezone().isoformat(timespec="seconds"),
+              "withdrew_release": bool(withdrawn)}
+    write_json(os.path.join(target, "rejected.json"), record)
+    log_decision(target, dict(record, decision="reject"))
     print("rejected {}{}; the agent can read the reason in {}".format(
         args.id, ", withdrawing its earlier release" if withdrawn else "", os.path.join(target, "rejected.json")))
 

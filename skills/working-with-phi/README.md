@@ -71,13 +71,19 @@ When the agent needs to see what a job printed or saved, it runs `phi collect` a
   or editor, outside the agent's session.
 
 Either way, delete anything that must not reach the agent, save, and run
-`phi release <id>` or `phi reject <id> "reason"`, in your own terminal. Release
+`phi release <id>` or `phi reject <id> "reason"`. Run it in your own terminal, or
+in the agent's session by typing `!` as the very first character of the prompt
+(`!phi release <id>`; a space before the `!` sends the line to the agent as a
+message instead). Commands typed with `!` skip the hooks that stop the agent from
+releasing, and release prints only the id, the line count and the released path,
+so nothing from the file enters the conversation. Release
 copies the file as you left it into the released area, with a receipt saying who
 released it, when, and its checksum. The latest decision stands: rejecting a review
-you released earlier removes the released copy.
+you released earlier removes the released copy. Every decision is also appended to
+`decisions.jsonl` beside it, so a withdrawn release stays on record.
 
 Do not view held files through the agent's prompt. A `!` command's output goes to
-the model. A hook message shown to you alone is still written to the session
+the model, so `!less` or `!cat` on a held file sends it there. A hook message shown to you alone is still written to the session
 transcript, which is stored on Anthropic's servers while Remote Control is
 connected.
 

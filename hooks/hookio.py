@@ -138,7 +138,7 @@ def commits(command):
     return False
 
 
-def run(arguments, cwd=None, timeout=60):
+def run(arguments, *, timeout, cwd=None):
     """One bounded subprocess as (exit status, output), or None when it cannot be run."""
     try:
         done = subprocess.run(arguments, stdout=subprocess.PIPE,

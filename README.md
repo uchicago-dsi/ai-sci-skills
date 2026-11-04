@@ -70,8 +70,12 @@ Each name links to the skill's folder.
   loop with a fixed budget and stop rule.
 - **[rut-breaker](skills/rut-breaker/)**: detect low-yield loops and force a
   better reset move.
+
+### Protected data
+
 - **[working-with-phi](skills/working-with-phi/)**: work on protected health
-  data on a cluster without it entering the agent's session.
+  data, on a cluster or a single machine, without it entering the agent's
+  session.
 
 ### Keeping records
 

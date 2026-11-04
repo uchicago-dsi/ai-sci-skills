@@ -9,8 +9,9 @@ It differs from developing on synthetic data and having a person run the real
 thing: here the agent debugs on the real data, through jobs whose output it cannot
 see. Building a faithful synthetic copy costs about as much as that debugging.
 
-Claude Code only for now. The hooks use the shared helper in `hooks/hookio.py`, so
-Codex can be added once its sandbox has been checked.
+Claude Code only for now. The checks Claude Code runs before and after each agent
+action (its hooks) go through one helper, `hooks/hookio.py`, so Codex can be added
+once its sandbox has been checked.
 
 ## Parts
 
@@ -25,8 +26,8 @@ Codex can be added once its sandbox has been checked.
 | Layout | `labdisk layout`, in [labdisk](https://github.com/annawoodard/labdisk) | summarizes data folders with every name replaced by its shape |
 
 Everything except `labdisk layout` runs on the system Python 3 (3.6 on RHEL 8) with
-no packages. `labdisk layout` needs Python 3.11 or newer; RHEL 8 installs it beside
-the system Python as `python3.11`, which is enough to install labdisk as below.
+no packages. `labdisk layout` needs Python 3.11 or newer; on RHEL 8 that is
+`python3.11`, installed beside the system Python.
 
 ## Setting up
 
@@ -52,12 +53,17 @@ the system Python as `python3.11`, which is enough to install labdisk as below.
    Optional fields: `identifier_patterns` (name to regular expression, for a site's
    own accession or study numbers), `key_columns` (extra column names the
    pasted-rows check looks for) and `max_review_lines` (default 5,000).
-3. Run `phi settings --write`. It adds the three hooks, rules that deny Claude's
-   file tools any read of the protected and held folders, and the operating-system
-   sandbox, to `.claude/settings.local.json`. That file is not committed, because
+3. Run `phi settings --write`. It adds to `.claude/settings.local.json` the three
+   hooks, rules that deny Claude's file tools any read of the protected and held
+   folders, and the operating-system sandbox, which stops a command the agent runs
+   directly from opening those folders, even one that does not name them (job
+   submission and `phi` run outside it, since their output goes to the held area).
+   That file is not committed, because
    it names this cluster's paths. Restart Claude Code in the project.
-4. Run `phi check`. Every row must pass. On Linux the sandbox needs `bubblewrap`
-   and `socat`; if either is missing, ask the cluster's administrators to install it.
+4. Run `phi check`. Every row must pass. On Linux the sandbox is built on two
+   packages, `bubblewrap` and `socat`; if either is missing, ask the cluster's
+   administrators to install it. Until both are there, Claude Code refuses to
+   start in the project, which is deliberate: it never runs without the sandbox.
 
 ## How a person reviews output
 
@@ -83,19 +89,20 @@ you released earlier removes the released copy. Every decision is also appended 
 `decisions.jsonl` beside it, so a withdrawn release stays on record.
 
 Do not view held files through the agent's prompt. A `!` command's output goes to
-the model, so `!less` or `!cat` on a held file sends it there. A hook message shown to you alone is still written to the session
-transcript, which is stored on Anthropic's servers while Remote Control is
-connected.
+the model, so `!less` or `!cat` on a held file sends it there. A message a hook
+shows to you alone is no better: it is still written to the session transcript,
+which is stored on Anthropic's servers while Remote Control (following or
+continuing the session from claude.ai or a phone) is connected.
 
 ## Limits
 
-- It stops accidents by an agent that is trying to follow the rules. An agent
+- This setup stops accidents by an agent that is trying to follow the rules. An agent
   working against them could, for example, submit a job that copies data into the
   released area.
 - The hooks see each command as typed. A script the agent runs directly, which
   opens a protected folder without naming it on the command line, is stopped only
   by the sandbox.
-- The automatic summary holds named numbers. A count that is really an identifier
+- The automatic summary holds only numbers, each under a name the job chose. A count that is really an identifier
   would pass; the fixed set of fields makes that unlikely, not impossible.
 - A blocked prompt can still be stored in the local transcript and prompt history.
 
@@ -106,6 +113,4 @@ consortium's clif-icu plugin,
 [Common-Longitudinal-ICU-data-Format/skills](https://github.com/Common-Longitudinal-ICU-data-Format/skills)
 (`hooks/phi_guard.py`, `hooks/phi_scan.py`), and from the sensitive-data demo built
 on it, [kaveriC/clif-sensitive-data-demo](https://github.com/kaveriC/clif-sensitive-data-demo)
-(`no-row-dumps.py`, `no-pasted-rows.py`, `phi-scan.py`). The workflow here departs
-from theirs by debugging on real data through jobs the agent cannot see, in place
-of developing on synthetic data.
+(`no-row-dumps.py`, `no-pasted-rows.py`, `phi-scan.py`).

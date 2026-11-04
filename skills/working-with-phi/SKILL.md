@@ -40,10 +40,12 @@ sbatch --output=/…/held/layout-001/slurm-%j.out <account, partition, time> --c
 ```
 
 Write the held path out in full in the `sbatch` line; the hook refuses an
-`--output` it cannot resolve, such as `$H/slurm-%j.out`. `labdisk layout` replaces every name with its shape (`9{8}` is eight digits)
-and merges siblings, so a person reviews a few hundred lines. If `labdisk` is not installed, point the
-person to the setup steps in this skill's README. Then collect and show it, as below. Once released,
-write jobs that find files by the patterns it shows.
+`--output` it cannot resolve, such as `$H/slurm-%j.out`. `labdisk layout`
+replaces every name with its shape (`9{8}` is eight digits) and merges siblings,
+so a person reviews a few hundred lines. If `labdisk` is not installed, point the
+person to the setup steps in this skill's README. Then collect and show the
+layout, as below. Once the person releases it, write jobs that find files by the
+patterns it shows.
 
 ## Run a job
 
@@ -56,11 +58,11 @@ write jobs that find files by the patterns it shows.
    flat JSON object of named numbers to the file named by `$PHI_COUNTS`:
    `{"exams_read": 1443, "mean_frames": 6.2}`.
 
-When it finishes, read `<released>/<id>/summary.json`, which is released without
-review. It holds the exit code, line and byte counts of standard output and error,
+When it finishes, read `<released>/<id>/summary.json` (`summary-<task>.json` for
+an array task), which is released without review. It holds the exit code, line and byte counts of standard output and error,
 your counts, and for a Python failure the exception type and the file and line in
 this project where it was raised, but never the exception's message. That is
-usually enough to fix a crash; an array task writes `summary-<task>.json`.
+usually enough to fix a crash.
 
 ## Ask a person to review
 
@@ -90,8 +92,8 @@ When you need what a job printed or saved:
 
 ## What this does not stop
 
-It stops accidents by an agent that is trying to follow it. An agent working
+This setup stops accidents by an agent that follows this skill. An agent working
 against it could, for example, submit a job that copies data into the released
 area. The sandbox is what stops a script you run directly from reading the data;
 until `phi check` shows it enabled, that protection rests on you following the
-rules above. A person reviewing a file is the last check, not an automatic one.
+rules above. The last check is a person reading the file, and a person can miss an identifier.

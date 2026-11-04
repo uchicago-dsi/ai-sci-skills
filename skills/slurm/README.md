@@ -33,3 +33,9 @@ Two environment variables fit it to a cluster, for example in the `env` block of
 | --- | --- | --- |
 | `SLURM_GUARD_LOGIN_HOSTS` | a regular expression matching login nodes' short host names | any machine with `sbatch` counts as a login node while outside a job |
 | `SLURM_GUARD_SHARED_ROOTS` | the shared filesystems, separated by `:`, such as `/gpfs:/scratch` | every path counts as shared except `/tmp`, `/var/tmp`, `/dev/shm` and `$TMPDIR` |
+| `SLURM_GUARD_SOURCE_TREES` | comma-separated pieces of path, such as `scripts/,docs/`, where inline code (`os.walk`, `rglob`) may walk, because a repository bounds them | every inline walk over a shared filesystem is refused |
+| `SLURM_GUARD_DATA_TREES` | pieces of path, such as `outputs/,runs/`, that make an inline walk refused even when it also names a source tree | none |
+
+The variables can also go in the hook's own command line, as
+`env SLURM_GUARD_SHARED_ROOTS=/gpfs:/ess /path/to/block_login_node_walks.py`,
+which works the same way in Claude Code and Codex.

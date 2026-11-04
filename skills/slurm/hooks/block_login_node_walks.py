@@ -25,6 +25,17 @@ Two settings, read from the environment, fit it to a cluster:
 - `SLURM_GUARD_SHARED_ROOTS`, the shared filesystems, separated by `:`, such as
   `/gpfs:/scratch`. Without it, every path counts as shared except local
   temporary space (`/tmp`, `/var/tmp`, `/dev/shm`, `$TMPDIR`).
+
+Two more, both comma-separated pieces of path, let inline code (`os.walk`,
+`rglob`, a `**` glob) walk a source tree, which a repository bounds and costs
+nothing, while still refusing it on data:
+
+- `SLURM_GUARD_SOURCE_TREES`, such as `scripts/,docs/,src/`;
+- `SLURM_GUARD_DATA_TREES`, such as `outputs/,runs/,dicom`.
+
+An inline walk passes when its command names a source tree and no data tree.
+Without the first setting every inline walk over a shared filesystem is
+refused, since its target cannot be established.
 """
 import json
 import os
@@ -37,6 +48,8 @@ import sys
 SHARED_ROOTS = tuple(r.rstrip("/") for r in os.environ.get("SLURM_GUARD_SHARED_ROOTS", "").split(":") if r)
 LOCAL_ROOTS = tuple(r.rstrip("/") for r in ("/tmp", "/var/tmp", "/dev/shm", os.environ.get("TMPDIR", "")) if r)
 LOGIN_HOSTS = os.environ.get("SLURM_GUARD_LOGIN_HOSTS")
+SOURCE_TREES = tuple(t for t in os.environ.get("SLURM_GUARD_SOURCE_TREES", "").split(",") if t)
+DATA_TREES = tuple(t for t in os.environ.get("SLURM_GUARD_DATA_TREES", "").split(",") if t)
 
 
 def under(path, roots):
@@ -167,7 +180,10 @@ def verdict(command, cwd):
 
     if INLINE_WALK.search(command) and (
             (SHARED_ROOTS and any(r in command for r in SHARED_ROOTS)) or is_shared(cwd)):
-        return "inline code walks a tree with os.walk, rglob or a ** glob"
+        names_source = any(t in command for t in SOURCE_TREES)
+        names_data = any(t in command for t in DATA_TREES)
+        if names_data or not names_source:
+            return "inline code walks a tree with os.walk, rglob or a ** glob"
     return None
 
 

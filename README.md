@@ -21,7 +21,8 @@ Install the skills from https://github.com/uchicago-dsi/ai-sci-skills for
 yourself, following its INSTALL.md.
 ```
 
-Add "only slurm and sensemaking", or similar, to install some of them.
+To install only some of them, name them: add "only slurm and sensemaking" to
+the prompt, and the agent installs those skills and nothing else.
 [`INSTALL.md`](INSTALL.md) tells the agent where skills go, installs each
 chosen skill with its own commands and helper agents (as plugins, for Claude
 Code), finishes the setup of the few skills that need more, and asks before

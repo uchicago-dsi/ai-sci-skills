@@ -27,7 +27,9 @@ and never reword the command to get past it.
 - **Never name a specific patient, exam or file** in a command, a file name or a
   message. Refer to items by position in a list the job builds ("item 3 of the
   sorted manifest") and let the job resolve the position to a path.
-- **Never run `phi release` or `phi reject`.** A person runs them after reading.
+- **Never run `phi release`, `phi reject` or `phi unprotect`.** A person runs
+  them. To protect another folder the person names, run `phi protect <folder>`,
+  which only adds, and ask them to restart Claude Code.
 
 ## Find where the data is
 

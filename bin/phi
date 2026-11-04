@@ -8,6 +8,8 @@
     phi show ID [--no-tmux]   open the review file for the person (a tmux pane, or tell them the path)
     phi release ID            (person only) let a reviewed file through to the released area
     phi reject ID REASON      (person only) turn it down, with a reason the agent can read
+    phi protect FOLDER...     add data folders to the protected list and update the settings
+    phi unprotect FOLDER...   (person only) take folders off the protected list
     phi list                  every held folder and what has happened to it
     phi check                 pass or fail for each protection layer; reads no data
     phi settings [--write]    the Claude Code settings this project needs
@@ -411,22 +413,92 @@ def merge(into, extra):
             into[key] = value
 
 
+def read_settings(path):
+    if not os.path.isfile(path):
+        return {}
+    with open(path, encoding="utf-8") as handle:
+        return json.load(handle)
+
+
+def write_settings(policy):
+    path = settings_files(policy)[2]
+    current = read_settings(path)
+    merge(current, recommended_settings(policy))
+    private_dir(os.path.dirname(path))
+    write_json(path, current)
+    return path
+
+
 def cmd_settings(policy, args):
-    wanted = recommended_settings(policy)
     if not args.write:
-        print(json.dumps(wanted, indent=2))
+        print(json.dumps(recommended_settings(policy), indent=2))
         print("\nMerge this into {} (it names this cluster's paths, so keep it out of git), or rerun "
               "with --write.".format(settings_files(policy)[2]), file=sys.stderr)
         return
+    print("wrote {}; restart Claude Code in this project for it to take effect".format(write_settings(policy)))
+
+
+def rewrite_config(policy, raw):
+    """Replace phi.json with `raw`, after checking that it loads as a valid policy."""
+    tmp = policy.path + ".tmp"
+    write_json(tmp, raw)
+    try:
+        updated = phi_policy.Policy(tmp)
+    except phi_policy.ConfigError as err:
+        os.unlink(tmp)
+        fail(str(err))
+    os.replace(tmp, policy.path)
+    updated.path = policy.path
+    return updated
+
+
+def raw_config(policy):
+    with open(policy.path, encoding="utf-8") as handle:
+        return json.load(handle)
+
+
+def cmd_protect(policy, args):
+    """Only ever adds folders, so an agent may run it: it cannot loosen what is protected."""
+    raw = raw_config(policy)
+    added = []
+    for folder in args.folders:
+        if not os.path.isabs(os.path.expanduser(folder)):
+            fail("{} is not an absolute path".format(folder))
+        if not os.path.isdir(phi_policy.resolve(folder)):
+            fail("{} is not a folder".format(folder))
+        if phi_policy.resolve(folder) in policy.protected or folder.rstrip("/") in raw["protected"]:
+            continue
+        raw["protected"].append(folder.rstrip("/"))
+        added.append(folder.rstrip("/"))
+    if not added:
+        print("already protected; nothing changed")
+        return
+    path = write_settings(rewrite_config(policy, raw))
+    print("now protected: {}. The guard applies from the next command; restart Claude Code so the read "
+          "rules and sandbox in {} include it.".format(", ".join(added), path))
+
+
+def cmd_unprotect(policy, args):
+    raw = raw_config(policy)
+    gone = {phi_policy.resolve(f) for f in args.folders}
+    keep = [p for p in raw["protected"] if phi_policy.resolve(p) not in gone]
+    if len(keep) == len(raw["protected"]):
+        fail("none of those folders is protected")
+    if not keep:
+        fail("at least one folder must stay protected; delete .claude/phi.json to stop protecting the project")
+    raw["protected"] = keep
+    rewrite_config(policy, raw)
     path = settings_files(policy)[2]
-    current = {}
-    if os.path.isfile(path):
-        with open(path, encoding="utf-8") as handle:
-            current = json.load(handle)
-    merge(current, wanted)
-    private_dir(os.path.dirname(path))
+    current = read_settings(path)
+    rules = ["{}(/{}/**)".format(tool, root) for root in gone for tool in ("Read", "Edit")]
+    deny = current.get("permissions", {}).get("deny", [])
+    current.setdefault("permissions", {})["deny"] = [r for r in deny if r not in rules]
+    fs = current.get("sandbox", {}).get("filesystem", {})
+    if "denyRead" in fs:
+        fs["denyRead"] = [p for p in fs["denyRead"] if p not in gone]
     write_json(path, current)
-    print("wrote {}; restart Claude Code in this project for it to take effect".format(path))
+    print("no longer protected: {}. Restart Claude Code in this project for it to take effect.".format(
+        ", ".join(sorted(gone))))
 
 
 def hook_registered(settings, event, script):
@@ -504,6 +576,8 @@ def main():
     reject = sub.add_parser("reject")
     reject.add_argument("id")
     reject.add_argument("reason")
+    sub.add_parser("protect").add_argument("folders", nargs="+")
+    sub.add_parser("unprotect").add_argument("folders", nargs="+")
     sub.add_parser("list")
     sub.add_parser("check")
     sub.add_parser("settings").add_argument("--write", action="store_true")

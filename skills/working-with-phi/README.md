@@ -7,7 +7,7 @@ automatically, or a file you have read and released.
 
 The usual alternative is to develop on synthetic data and have a person run the
 real thing. That means building the synthetic data, debugging the code on it,
-and then debugging it again on the real data, which rarely behaves the same.
+and then debugging it again on the real data, which may behave differently.
 Here there is one round: the agent debugs on the real data, through jobs whose
 output it can't see.
 
@@ -77,9 +77,11 @@ Do this once per project.
    `bubblewrap` or `socat` is missing; it will not run without the sandbox.
 4. Ask the agent to run `phi check`. Every row should say `PASS`.
 
-From then on, `.claude/phi.json` is yours to change; the agent's file-editing
-tools are refused there. To add a data folder later, edit it yourself and run
-`phi settings --write` again.
+To protect another data folder later, ask the agent; it runs
+`phi protect <folder>`, which can only add folders to the list. Then restart
+Claude Code. Loosening protection is yours alone: the agent cannot edit
+`.claude/phi.json` or run `phi unprotect <folder>`, which takes a folder off the
+list, so a refusal can never be worked around by un-protecting something.
 
 ## Step 2: give the agent a task
 
@@ -146,8 +148,8 @@ Things to avoid:
 | Part | Where | What it does |
 | --- | --- | --- |
 | The skill | `SKILL.md` | the workflow the agent follows |
-| `phi` | `bin/phi` | runs work blind, builds review files, opens them for you, releases them, checks setup |
-| Guard | `hooks/guard_phi.py` | before each tool call, refuses reads of protected or held folders, job logs outside the held area, `srun`/`salloc`/`ssh`, and agent-run releases |
+| `phi` | `bin/phi` | runs work blind, builds review files, opens them for you, releases them, adds protected folders, checks setup |
+| Guard | `hooks/guard_phi.py` | before each tool call, refuses reads of protected or held folders, job logs outside the held area, `srun`/`salloc`/`ssh`, and agent-run releases or `phi unprotect` |
 | Output scan | `hooks/phi_output_scan.py` | after a tool call, warns when output looks like it holds an identifier |
 | Pasted rows | `hooks/guard_phi_prompt.py` | drops a prompt that looks like pasted data rows |
 | Policy | `hooks/phi_policy.py` | reads the project's `.claude/phi.json`; shared by all of the above |

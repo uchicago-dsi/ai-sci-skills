@@ -123,7 +123,9 @@ class Policy(object):
                 if spelling.startswith(home + "/"):
                     spellings.add("~" + spelling[len(home):])
                     spellings.add("$HOME" + spelling[len(home):])
-            if any(s and s in text for s in spellings):
+            # A folder is named only when its path ends there or continues with `/`, so that
+            # `/data` does not match inside `/data2`.
+            if any(s and re.search(re.escape(s) + r"(?![^/\s'\";|&)`])", text) for s in spellings):
                 found.append(raw)
         return found
 

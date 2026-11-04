@@ -10,8 +10,8 @@ that code read or printed until a person has released it. This hook refuses:
   command, both of which send output to the held area instead of to the agent;
 - a job submission whose log would land outside the held area;
 - `srun`, `salloc` and `ssh`, which stream a remote command's output straight back;
-- writing to the released area or to the project's `phi.json`;
-- `phi release` and `phi reject`, which only a person runs;
+- writing to the released area or to the project's `phi.json` (`phi protect` adds folders);
+- `phi release`, `phi reject` and `phi unprotect`, which only a person runs;
 - reading another tmux pane, which is where a person reviews held output.
 
 It checks each call as written. A script the agent runs directly that opens a
@@ -37,7 +37,7 @@ import phi_policy  # noqa: E402
 FILE_PATH_KEYS = ("file_path", "path", "notebook_path")
 WRITE_TOOL_NAMES = ("Write", "Edit", "MultiEdit", "NotebookEdit")
 SEARCH_TOOL_NAMES = ("Grep", "Glob", "LS")
-SAFE_PHI_SUBCOMMANDS = ("new", "run", "collect", "show", "list", "check", "settings")
+SAFE_PHI_SUBCOMMANDS = ("new", "run", "collect", "show", "list", "check", "settings", "protect")
 REMOTE_SHELLS = ("srun", "salloc", "ssh")
 # sbatch options that take no value; every other option does.
 SBATCH_FLAGS = {"--exclusive", "--hold", "--parsable", "--wait", "--test-only", "--requeue",
@@ -137,6 +137,9 @@ def check_shell(policy, event):
     if re.search(r"(^|[\s/;&|(`])phi(\.py)?\s+(release|reject)\b", text):
         deny_tool("Refused: only a person releases or rejects a review, after reading it. Ask them "
                   "to run `phi release <id>` or `phi reject <id> \"reason\"` in their own terminal.")
+    if re.search(r"(^|[\s/;&|(`])phi(\.py)?\s+unprotect\b", text):
+        deny_tool("Refused: only a person takes a folder off the protected list. Ask them to run "
+                  "`phi unprotect <folder>`. You may add folders with `phi protect <folder>`.")
     if re.search(r"\btmux\b.*\b(capture-pane|capturep|save-buffer|saveb|show-buffer|showb|"
                  r"pipe-pane|pipep)\b", text):
         deny_tool("Refused: reading a tmux pane's contents could copy held output that a person is "

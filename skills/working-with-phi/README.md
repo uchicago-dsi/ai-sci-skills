@@ -9,7 +9,8 @@ The usual alternative is to develop on synthetic data and have a person run the
 real thing. That means building the synthetic data, debugging the code on it,
 and then debugging it again on the real data, which may behave differently.
 Here there is one round: the agent debugs on the real data, through jobs whose
-output it sees only after you have read it and released it.
+output it sees only after you have read it and released it, apart from a short
+numeric summary of each job.
 
 Claude Code only for now.
 

@@ -73,7 +73,8 @@ When the agent needs to see what a job printed or saved, it runs `phi collect` a
 Either way, delete anything that must not reach the agent, save, and run
 `phi release <id>` or `phi reject <id> "reason"`, in your own terminal. Release
 copies the file as you left it into the released area, with a receipt saying who
-released it, when, and its checksum.
+released it, when, and its checksum. The latest decision stands: rejecting a review
+you released earlier removes the released copy.
 
 Do not view held files through the agent's prompt. A `!` command's output goes to
 the model. A hook message shown to you alone is still written to the session

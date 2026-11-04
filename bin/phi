@@ -327,10 +327,16 @@ def cmd_release(policy, args):
 def cmd_reject(policy, args):
     held_dir(policy, args.id)
     target = private_dir(os.path.join(private_dir(policy.released), args.id))
+    # The latest decision stands: rejecting withdraws an earlier release, as releasing clears a rejection.
+    withdrawn = [n for n in REVIEW_FILES + ("receipt.json",) if os.path.isfile(os.path.join(target, n))]
+    for name in withdrawn:
+        os.unlink(os.path.join(target, name))
     write_json(os.path.join(target, "rejected.json"), {
         "id": args.id, "rejected_by": getpass.getuser(), "reason": args.reason,
-        "rejected_at": datetime.datetime.now().astimezone().isoformat(timespec="seconds")})
-    print("rejected {}; the agent can read the reason in {}".format(args.id, os.path.join(target, "rejected.json")))
+        "rejected_at": datetime.datetime.now().astimezone().isoformat(timespec="seconds"),
+        "withdrew_release": bool(withdrawn)})
+    print("rejected {}{}; the agent can read the reason in {}".format(
+        args.id, ", withdrawing its earlier release" if withdrawn else "", os.path.join(target, "rejected.json")))
 
 
 def cmd_list(policy, args):

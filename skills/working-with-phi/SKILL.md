@@ -75,7 +75,9 @@ When you need what a job printed or saved:
 3. Stop and tell the person what you asked for and why. Do not poll.
 4. They run `phi release <id>` or `phi reject <id> "reason"`. Read
    `<released>/<id>/review.txt` or `rejected.json`. They may have cut lines; the
-   released file is what you have.
+   released file is what you have. The latest decision stands: if a
+   review you already read is later rejected, its file disappears, and you stop
+   using anything you took from it.
 
 ## Set up a project
 

@@ -1,7 +1,7 @@
 # Installing ai-sci-skills
 
 These steps are written for a coding agent installing the skills for the person
-it works with. Do them in order. Before any step marked **Ask**, say what you
+it works with; a person installing by hand can follow them the same way. Do them in order. Before any step marked **Ask**, say what you
 are about to change and wait for a yes. When you finish, report what you
 installed, where, and what you skipped.
 

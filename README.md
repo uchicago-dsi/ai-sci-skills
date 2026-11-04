@@ -26,26 +26,7 @@ skills and the commands in `bin/`, finishes the setup of the few skills that
 need more, and asks before changing your shell profile, scheduled jobs or agent
 settings. Restart the agent session afterwards.
 
-<details>
-<summary>Installing by hand</summary>
-
-Clone the repository, then link each skill folder into your agent's skills
-directory and each command onto your `PATH`:
-
-```bash
-git clone https://github.com/uchicago-dsi/ai-sci-skills.git ~/ai-sci-skills
-SKILLS_DIR=~/.claude/skills   # or ~/.codex/skills, ~/.cursor/skills, ~/.gemini/skills
-mkdir -p "$SKILLS_DIR" ~/.local/bin
-for d in ~/ai-sci-skills/skills/*/; do ln -sfn "${d%/}" "$SKILLS_DIR/$(basename "$d")"; done
-for f in ~/ai-sci-skills/bin/*; do ln -sfn "$f" ~/.local/bin/; done
-```
-
-A project-level install uses `.claude/skills/` (or the other agents' equivalent)
-inside the project. Copy with `cp -R` in place of `ln` for a fixed snapshot.
-A few skills need one more step; the table in step 5 of
-[`INSTALL.md`](INSTALL.md) lists them.
-
-</details>
+To install by hand, follow [`INSTALL.md`](INSTALL.md) yourself.
 
 ## Skills
 

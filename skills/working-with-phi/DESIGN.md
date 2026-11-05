@@ -9,6 +9,8 @@ This document says how the agent is kept away from the data, what that
 protects against, and what it does not. It is written for the people who run
 the machines it runs on. How to use the tool is in [README.md](README.md).
 
+Planned, not built.
+
 ## The three places
 
 Each project names three kinds of folder in `.claude/phi.json`. A *job* here
@@ -21,41 +23,13 @@ on or under Slurm.
 | held | everything a job prints or saves | no | no (only the job writes there) |
 | released | output a person has read and copied out of held | yes | no |
 
-A person releases output by running `phi release` in their own terminal. The
-agent is not allowed to run it; today only the hooks below enforce that.
+A person releases output by running `phi release` in their own terminal.
 
-## What separates the agent from the data today
+## The agent runs in a sandbox without the data
 
-Today the agent, its jobs and the person all run as the same Unix user, and
-only Claude Code enforces the separation:
-
-- **Hooks**, scripts Claude Code runs before each command and each message,
-  refuse a command that names a protected or held folder and say what to do
-  instead. They also refuse a message from the person that looks like pasted
-  data rows.
-- **Permission rules** refuse Claude Code's built-in file tools (Read, Grep,
-  Glob), which open files from inside Claude Code itself, on those folders.
-- **Claude Code's sandbox** runs each shell command in bubblewrap with those
-  folders unreadable. On Linux it also needs `socat`, which Randi does not have,
-  so on Randi this layer is off today.
-
-Three gaps follow (the first two raised by Mike Jarsulic, 2026-11-04):
-
-- The file tools run outside bubblewrap. Only the permission rules guard them,
-  so a bug in how Claude Code matches paths would expose the data.
-- A job runs agent-written code as the person, so it can write anywhere they
-  can. A careless `df.to_csv("debug.csv")` puts data rows beside the code,
-  where the agent reads them.
-- With the sandbox off, a shell command is checked only by its text. Code that
-  builds a data path at run time gets through.
-
-## Proposed: run the whole agent in bubblewrap
-
-Planned, not built.
-
-The agent should run inside a bubblewrap sandbox in which the protected and
-held folders do not exist, whichever tool asks for them. A launcher starts it
-in place of `claude`:
+The agent runs inside a bubblewrap sandbox in which the protected and held
+folders do not exist, whichever tool asks for them. A launcher starts it in
+place of `claude`:
 
 ```bash
 phi agent
@@ -65,6 +39,8 @@ The sandbox shows only folders it is told to show: the project's code, the
 person's home and environments, and system directories. Hiding the data folders
 from an otherwise complete view would miss other routes to the same files, such
 as GPFS snapshot folders (`.snapshots`) and second mount points.
+
+## Jobs run in a sandbox that can only write to held
 
 Jobs reach the data through a runner that `phi agent` starts outside the
 sandbox. The agent asks the runner, over a socket, to run a folder of code. The
@@ -82,9 +58,9 @@ same sandbox on the compute node. `sbatch` is hidden inside the agent's
 sandbox, so the agent cannot submit a job the ordinary way. One route remains;
 see below.
 
-With the agent's sandbox in place, Claude Code's own sandbox is no longer needed
-to protect the data, and neither is `socat`, which only that sandbox uses. The
-hooks stay, because they tell the agent what to do instead of only refusing.
+Claude Code's hooks, scripts it runs before each command, still refuse commands
+that name a protected or held folder. They are there to tell the agent what to
+do instead; the sandboxes are what keep the data out.
 
 This needs no administrator. It needs Linux with unprivileged user namespaces
 and bubblewrap, both present on Randi's login and compute nodes
@@ -93,17 +69,17 @@ and bubblewrap, both present on Randi's login and compute nodes
 
 ## What it protects against, and what it does not
 
-| Threat | Today on Randi | With `phi agent` |
-| --- | --- | --- |
-| the agent reads a data file by mistake | refused only when the command names the folder | the folder does not exist for the agent |
-| a job writes data rows where the agent can read them | possible | refused: a job can write only to held |
-| a job sends data over the network | possible | refused: jobs have no network |
-| an agent deliberately working around the rules | the hooks only | refused, except by submitting its own Slurm job; see below |
+| Threat | Result |
+| --- | --- |
+| the agent reads a data file by mistake | the folder does not exist for the agent |
+| a job writes data rows where the agent can read them | refused: a job can write only to held |
+| a job sends data over the network | refused: jobs have no network |
+| an agent deliberately working around the rules | refused, except by submitting its own Slurm job; see below |
 
-Because everything still runs as one Unix user, an agent deliberately working
-around the rules could bring its own copy of `sbatch` and submit a job that runs
-as the person, outside any sandbox. Separate Unix users close that, at the cost
-of administrator setup:
+Because everything runs as one Unix user, an agent deliberately working around
+the rules could bring its own copy of `sbatch` and submit a job that runs as the
+person, outside any sandbox. Separate Unix users close that, at the cost of
+administrator setup:
 
 | Account | Can read | Can write |
 | --- | --- | --- |

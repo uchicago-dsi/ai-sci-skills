@@ -8,15 +8,11 @@ share, which each skill's `hooks/` folder links to.
 
 | Skill | Hook | Refuses | Turned on |
 | --- | --- | --- | --- |
-| `working-with-phi` | `guard_phi.py` | in a project with `.claude/phi.json`: reading a protected or held folder, a job log outside the held area, `srun`/`salloc`/`ssh`, an agent-run `phi release` | automatically by the plugin, or per project by `phi settings --write` |
-| | `phi_output_scan.py` | nothing; warns when output looks like it holds an identifier | same |
-| | `guard_phi_prompt.py` | a prompt that looks like pasted data rows | same |
 | `slurm` | `block_login_node_walks.py` | a recursive `find`, `rg`, `du` or `os.walk` over a shared filesystem from a login node | by hand, below; settings in `skills/slurm/README.md` |
 | `humanize` | `guard_american_spelling.py` | a `git commit` that adds British spellings to prose, comments or strings | by hand, below |
 
-Only hooks that do nothing until a project opts in turn themselves on. The
-working-with-phi hooks stay silent without `.claude/phi.json`; the other two
-would act in every repository, so you choose them.
+None of them turns itself on. Each would act in every repository, so you
+choose them.
 
 ## Why a hook and not a written rule
 
@@ -43,8 +39,8 @@ catches it" protects nobody whose agent cannot run the hook.
 
 ## Turning one on by hand
 
-Skills installed as Claude Code plugins register their own hooks where the
-table says so. Otherwise, add the hook to the agent's settings, naming the
+Add the hook to the agent's settings, whether or not its skill is installed as
+a plugin, naming the
 script by its absolute path in your clone (`H` below stands for
 `~/ai-sci-skills/skills`, written out in full; the agents do not expand `~`
 here).
@@ -128,6 +124,5 @@ def main():
 main()
 ```
 
-If it should turn on with the plugin, add `hooks/hooks.json` to the skill, as
-`skills/working-with-phi/hooks/hooks.json` does, and only if the hook does
-nothing until a project opts in.
+To have the plugin turn it on, add a `hooks/hooks.json` to the skill, but only
+if the hook does nothing until a project opts in.

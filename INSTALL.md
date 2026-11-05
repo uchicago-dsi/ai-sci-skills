@@ -103,7 +103,6 @@ skills you installed:
 | `agentcomm` | Install the `agentcomm` command as `skills/agentcomm/SKILL.md` describes under "Where It Lives". **Ask** first; it installs an npm package. |
 | `quota-saving-mode` | Nothing for Claude Code. Codex uses `await-notify` from step 4. |
 | `claude-code-worker` | Needs the `claude` command installed and logged in; if it is missing, tell the person. |
-| `working-with-phi` | Needs `labdisk`; install it as `skills/working-with-phi/README.md` describes. The person runs `phi release` in their own terminal, so link `phi` as in step 4 even under plugins. Setting up a project comes later, when the person asks. |
 | `slurm` | Nothing now. On first use in a project it writes the cluster's facts to `docs/slurm-site.md`. Its login-node guard is optional: **ask** before turning it on, as `hooks/README.md` describes. |
 | `humanize` | Its US-spelling commit guard is optional: **ask** before turning it on, as `hooks/README.md` describes. |
 

@@ -96,10 +96,6 @@
     {
       "name": "training-run-hygiene",
       "source": "./skills/training-run-hygiene"
-    },
-    {
-      "name": "working-with-phi",
-      "source": "./skills/working-with-phi"
     }
   ]
 }

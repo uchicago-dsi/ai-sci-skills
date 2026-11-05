@@ -71,12 +71,6 @@ Each name links to the skill's folder.
 - **[rut-breaker](skills/rut-breaker/)**: detect low-yield loops and force a
   better reset move.
 
-### Protected data
-
-- **[working-with-phi](skills/working-with-phi/)**: work on protected health
-  data, on a cluster or a single machine, without it entering the agent's
-  session.
-
 ### Keeping records
 
 - **[lab-notebook](skills/lab-notebook/)**: keep records restartable and

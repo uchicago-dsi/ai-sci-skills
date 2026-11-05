@@ -77,3 +77,43 @@ context without you running `inbox`:
 ```bash
 agentcomm send "$AGENTCOMM_AGENT" "delivery self-test" --as "$AGENTCOMM_AGENT"
 ```
+
+# The launcher: `agentcomm_local.py`
+
+`agentcomm_local.py` sits between every agent and the pinned CLI. The delivery
+hook above calls it too, through `~/.local/bin/agentcomm`. It does four things
+the CLI does not:
+
+- **Keeps the mailbox local.** It pins the file backend under
+  `~/.local/share/agentcomm/mailbox` and refuses remote backends, the daemon,
+  and automatic hook wiring.
+- **Checks the version.** It refuses to run when the installed package is not
+  the reviewed version, 0.21.0.
+- **Refuses `peek`.** Reading without consuming leaves a mailbox looking
+  permanently unread to every peer.
+- **Matches names without regard to case.** The file backend keys each inbox
+  by the literal name, so mail to `laforge` lands in a directory `LaForge`
+  never reads. The launcher rewrites `--as` and the `send` recipient to the
+  registered spelling. It refuses a name that matches two registrations
+  differing only by case.
+
+## Install
+
+Copy the script; do not symlink it. The script locates the mailbox and the npm
+package from its own path, and a symlink resolves to this repository instead.
+
+```bash
+mkdir -p ~/.local/lib/agentcomm
+cp skills/agentcomm/hooks/agentcomm_local.py ~/.local/lib/agentcomm/
+(cd ~/.local/lib/agentcomm && npm install @yonidavidson/agentcomm@0.21.0)
+```
+
+Then write `~/.local/bin/agentcomm`, naming this machine's Python and Node:
+
+```sh
+#!/bin/sh
+AGENTCOMM_NODE=/path/to/bin/node exec /path/to/bin/python ~/.local/lib/agentcomm/agentcomm_local.py "$@"
+```
+
+With `AGENTCOMM_NODE` unset, the launcher fails and says so; it does not fall
+back to whatever `node` is first on `PATH`.

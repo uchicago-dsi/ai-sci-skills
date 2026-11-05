@@ -73,16 +73,6 @@ defaults for other clusters. Do not restart shared infrastructure to onboard a l
   compare like with like, label the x-axis/unit explicitly, and never connect stage
   resets or resumed prefixes as one trajectory. Do not merge genuinely different
   fixed-crop and sampled-crop eval losses just to make their labels match.
-- **No bar charts or bar graphs in Trackio.** Show singleton summaries, counts,
-  categorical readouts and histogram bins as sortable tables; use line plots for
-  learning histories. Do not accept the frontend's automatic singleton bar chart.
-  This applies to new registrations and existing dashboard views across lanes.
-- Show comparable training and validation checkpoint metrics together, with stable
-  run colors and distinct labeled line styles for the data roles. Preserve exact
-  metric names and separate augmented crop objectives from full-cohort native
-  readouts. Sparse validation points must remain visible and unsmoothed; do not
-  imply evaluation through a later training step. Verify actual rendered curves
-  for the selected runs before calling dashboard onboarding complete.
 - Use information tables for epochs completed, optimizer updates, presentations
   or augmented examples seen, batch size, participant counts and pending readouts.
   Do not turn these counters into bar charts or redundant epoch-versus-step plots.

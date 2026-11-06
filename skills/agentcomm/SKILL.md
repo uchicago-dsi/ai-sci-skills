@@ -59,6 +59,25 @@ the requested work is done, only that you have seen it.
 
 Never bind another live agent's name.
 
+## Register Your Lane With Your Name
+
+A name on the roster says a mailbox exists, not what its owner does. Peers
+route questions by lane, and an agent with a mailbox but no lane gets asked
+about work it does not own, or never asked about work it does. So when a
+project keeps a lanes table (its AGENTS.md routing names it), registering a
+name includes registering its lane:
+
+- Read the table. If your name already owns a row, check its scope, status
+  and pronouns are still true and correct them if not.
+- Otherwise add one row: lane, scope, your name, your pronouns (your
+  character's; if your name is no character's, ask the user), status, and
+  the notebook you write to.
+- Before adding it, compare your scope with every existing row. If it
+  overlaps substantially with another agent's lane, do not add it: tell the
+  user which lanes overlap and how, and let them decide who owns what.
+- Commit only the table file, by path, and push. Re-read it immediately
+  before editing, because other agents add rows too.
+
 ## Read By Consuming, So Your Counters Stay True
 
 `agentcomm agents` shows every agent's unread depth and how long ago it last

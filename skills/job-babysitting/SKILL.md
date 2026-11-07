@@ -76,6 +76,30 @@ When using this skill, report:
 - For `completed`, inspect a representative visual artifact as well when a job can finish while still producing qualitatively bad output.
 - For `unknown`, run the fastest check that can reclassify the state.
 
+## A Failed Login Halts Everything
+
+A refused login to an external service (a file share, a web portal, a database, a
+remote host) stops all work that uses that credential, immediately. Do not retry,
+resubmit, rerun, or test the login, by hand or by script, and do not start another
+job that logs in with it. Most accounts lock after a few failed attempts, and a
+locked account usually needs a favour from someone outside the lab to undo. When a
+password changes, every client still holding the old one fails, and those failures
+together are what lock the account: one password change once locked a shared
+hospital account while two agents' transfers kept logging in.
+
+- Treat any authentication refusal as this case, whatever the error code:
+  `NT_STATUS_LOGON_FAILURE`, `NT_STATUS_ACCESS_DENIED` at login,
+  `NT_STATUS_ACCOUNT_LOCKED_OUT`, HTTP 401, a returned login page, `Permission
+  denied (publickey)`. A first refusal is enough. No allowance of one more try.
+- Stop every client you own that uses the credential: cancel or hold its jobs,
+  timers, cron entries and retry loops, and confirm none is still running, including
+  processes left on a data-transfer node after the scheduler job ended.
+- Tell the user at once: which service refused, when, the error code, and how many
+  attempts your clients made. Tell every other agent that uses the same account so
+  they stop too. Never print the credential.
+- Resume only after the user says the credential works. Then make a single attempt
+  that halts on its first refusal.
+
 ## Report Like An Operator
 
 - Include exact evidence paths, timestamps, counters, and job or run IDs.

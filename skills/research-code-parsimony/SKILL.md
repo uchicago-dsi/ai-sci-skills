@@ -116,6 +116,11 @@ Inspired by [Ponytail](https://github.com/DietrichGebert/ponytail)'s reuse-first
   imports, generation chains, shims, and duplicated near-copies outright, and accept
   some short-term instability. A bug is cheaper to find and fix than a large body of
   tangled code is to carry.
+- Code that logs in to an external service never retries authentication. The
+  first refused login raises and ends the process, and a worker pool cancels its
+  queued logins instead of letting each worker try once. Retry transient transport
+  errors if you must, but never a refusal, because repeated failed logins lock the
+  account. `job-babysitting` has what the agent does next.
 - The one thing that earns its place is a field or branch a live owner actually
   reads. Establish that with a search rather than assuming, and say which readers
   you found.

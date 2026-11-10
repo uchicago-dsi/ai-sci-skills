@@ -135,6 +135,11 @@ integrating a change or relying on a conclusion. Worker summaries are evidence t
 verify, not substitutes for verification. The manager retains responsibility for
 scientific interpretation, conflicting findings and the next decision.
 
+For native Codex sub-agents, use `followup_task` to assign work to a completed or
+idle worker. `send_message` does not start a turn; use it to steer a running
+worker. After approving an action, verify that the worker is running or has
+acknowledged it before treating the action as dispatched.
+
 ## Preserve Context Economically
 
 - Ask workers to return one compact envelope: state, decision-changing evidence,

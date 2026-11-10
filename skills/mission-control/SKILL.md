@@ -104,6 +104,12 @@ material resources, and whether the user authorized that action.
 
 ## Preserve Mission-Control Focus
 
+For new sub-agents, Anna's current default is Terra (`gpt-6.1-terra`),
+including nested delegation. Select it explicitly unless Anna requests another
+model. When the tool requires `fork_turns="none"` for a model override, supply
+the task, constraints and relevant artifact paths in the worker's prompt.
+Leave existing workers on their current models.
+
 Mission control owns:
 
 - the big-picture objective and decision sequence;

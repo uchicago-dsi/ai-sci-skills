@@ -21,6 +21,11 @@ touching the index are not.
 - A validation run across a populated index is a collision window, and the other
   owner's next commit will absorb whatever is sitting there.
 
+Do validation and review before requesting any index coordination. Never reserve
+main or hold other agents' commits while waiting on jobs, checks or reviews.
+Coordinate only overlapping files and the brief index/commit operation; disjoint
+work can proceed. Release any explicit hold as soon as that operation ends.
+
 ## Stage And Commit As One Action
 
 `git add` followed by a separate `git commit` is two actions, and another owner's

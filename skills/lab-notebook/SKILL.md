@@ -19,6 +19,11 @@ Each durable lane has one notebook for evidence and one matching goals file for
 its current objective, subgoals, dependencies and progress. Derive the goals name
 from the registered notebook, not the agent, experiment, date or restart.
 
+Keep a linked design document for the lane's current chosen approach. Apply
+[humanize](../humanize/SKILL.md) and its design-document register whenever drafting
+or revising goals or design. Manager setup and lane-index links follow
+[mission-control onboarding](../mission-control/SKILL.md#onboard-every-manager-into-a-lane).
+
 Goals are not logs. Put every goals file in the project's goals directory,
 `docs/goals/` unless the project already has one, never under `logs/`. Name it
 for the lane stem: the notebook's basename with any notebook role removed.

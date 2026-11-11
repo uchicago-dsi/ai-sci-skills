@@ -1,12 +1,51 @@
 ---
 name: mission-control
-description: "Coordinate multiple long-running agents or workers while preserving the global goal, current evidence, and timely steering. Use when supervising tmux or managed agents, delegating parallel work, reconciling queued corrections, preventing workers from acting on stale direction, or serving as mission control across experiments, jobs, and implementation streams."
+description: "Coordinate multiple long-running agents or workers while preserving the global goal, current evidence, and timely steering. Use when starting or resuming a manager lane, supervising tmux or managed agents, delegating parallel work, reconciling queued corrections, preventing workers from acting on stale direction, or serving as mission control across experiments, jobs, and implementation streams."
 ---
 
 # Mission Control
 
 Maintain the global objective while workers execute bounded tasks. Treat
 steering as a control signal, not a FIFO inbox.
+
+## Onboard Every Manager Into A Lane
+
+Before independent lane execution, every new manager completes this setup. On a
+restart, verify and update the existing records; do not create duplicate lanes or
+plans. Bounded workers use their manager's lane, goals and design.
+
+1. **Register in AgentComm.** Bind your own durable name using
+   [agentcomm](../agentcomm/SKILL.md), verify it in the roster, and consume your
+   inbox. Claude also registers as that name. Never take another live identity.
+2. **Register in the project's lane index.** Read the table routed by `AGENTS.md`;
+   HFDP uses `docs/lab_notebooks/README.md`, Prima uses
+   `docs/model_development/lanes.md`. Reuse your existing row or add the lane,
+   scope, manager, status, and links to its notebook, goals and design. Check
+   overlapping ownership before adding a row; resolve a substantive conflict
+   with the user. If the project has no index, create a short one in its docs and
+   route to it from `AGENTS.md`. Re-read the table immediately before editing.
+3. **Draft current goals.** Follow [lab-notebook](../lab-notebook/SKILL.md) for
+   the paired goals/notebook locations. State the outcome, next assignable steps,
+   dependencies, completion conditions and open decisions. Drafting a file does
+   not activate a persistent goal or authorize new work.
+4. **Ensure the lane has a design document.** Reuse its existing document or
+   create one in the project's layout. Describe the chosen approach, inputs,
+   outputs and the few comparisons actually planned. Mark what is built, planned
+   and open. Link goals/design to each other and from the lane row. Keep history
+   in the notebook and unused alternatives in existing literature or ideas notes.
+
+**Humanize goals and design on creation and every revision.** Read and apply
+[humanize](../humanize/SKILL.md) with its
+[design-document register](../humanize/registers/design-doc.md), even without an
+explicit `/humanize` request. Write for the person deciding whether they agree
+with the plan: plain language, defined terms, short sections, current decisions
+and concrete next steps. The reader should not need the code or prior conversation
+to understand what will be built and why. Remove superseded plans from current docs.
+
+Verify links and commit/push your files using
+[shared-checkout-git](../shared-checkout-git/SKILL.md). Finish validation before
+brief index coordination; onboarding does not reserve main or block disjoint
+commits while waiting on checks or reviews.
 
 ## Establish The Current Control State
 

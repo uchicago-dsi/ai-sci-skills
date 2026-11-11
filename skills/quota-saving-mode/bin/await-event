@@ -12,7 +12,7 @@
 
 set -uo pipefail
 
-INTERVAL=30
+INTERVAL=300
 MAX_BLOCK=900
 PROG=${0##*/}
 
@@ -26,7 +26,7 @@ usage: await-event [--interval S] [--max-block S] <kind> <args...>
   await-event log <path> <regex>         regex appears in newly appended bytes
   await-event cmd <command...>           command exits 0
 
-  --interval S    seconds between internal polls (default 30)
+  --interval S    seconds between internal polls (default 300)
   --max-block S   give up and return still_waiting after S seconds (default 900)
 
 Always returns exactly one JSON line. Nothing is printed while waiting.
@@ -78,31 +78,69 @@ still_waiting() {
 }
 
 # --- slurm ------------------------------------------------------------------
+# Every watcher of this user on this host shares one queue snapshot, and at most
+# one snapshot query is in flight at a time. One `squeue -j` per watched job per
+# poll, with no time limit, put 27 watchers' hung queries on an overloaded
+# controller at once (Randi, 2026-11-11). Now a watcher reads a snapshot younger
+# than its interval; failing that it refreshes the snapshot under a lock; and if
+# another watcher holds the lock, that query is still outstanding, so it launches
+# nothing and tries again next poll.
+#
 # Queue absence or an expired job ID requires explicit terminal accounting.
 # Scheduler RPC failures and delayed accounting leave the job unresolved.
+SLURM_QUERY_TIMEOUT=60
+SNAPSHOT_DIR=${AWAIT_EVENT_STATE:-$HOME/.local/state/await-event}
+SNAPSHOT=$SNAPSHOT_DIR/squeue_$(hostname -s).txt
+
 slurm_state() {
     local id=$1 row
-    row=$(sacct -j "$id" -X -n -P -o State,ExitCode,Elapsed 2>/dev/null | head -1)
+    row=$(timeout "$SLURM_QUERY_TIMEOUT" sacct -j "$id" -X -n -P -o State,ExitCode,Elapsed 2>/dev/null | head -1)
     [[ -n $row ]] && printf '%s' "$row"
+}
+
+snapshot_age() {
+    local mtime
+    mtime=$(stat -c %Y -- "$SNAPSHOT" 2>/dev/null) || { echo 999999; return; }
+    echo $(( $(date +%s) - mtime ))
+}
+
+# Succeeds when the snapshot is younger than INTERVAL, refreshing it if this
+# watcher wins the lock. Fails when no current snapshot can be had this poll.
+fresh_snapshot() {
+    [[ $(snapshot_age) -lt $INTERVAL ]] && return 0
+    mkdir -p "$SNAPSHOT_DIR"
+    (
+        flock -n 9 || exit 1
+        # Another watcher may have refreshed it between the age check and the lock.
+        [[ $(snapshot_age) -lt $INTERVAL ]] && exit 0
+        tmp=$SNAPSHOT.$$
+        if LC_ALL=C timeout "$SLURM_QUERY_TIMEOUT" squeue --me -h -o '%A %i %F %T' >"$tmp" 2>/dev/null; then
+            mv -f -- "$tmp" "$SNAPSHOT"
+        else
+            rm -f -- "$tmp"; exit 1
+        fi
+    ) 9>"$SNAPSHOT.lock"
+}
+
+# A job is live when any queue row names it as its own ID, its array-task form,
+# or its array's ID.
+in_snapshot() {
+    awk -v id="$1" '$1 == id || $2 == id || $3 == id { found = 1; exit } END { exit !found }' "$SNAPSHOT"
 }
 
 await_slurm() {
     [[ $# -ge 1 ]] || usage
     command -v squeue >/dev/null || { echo "$PROG: squeue not found" >&2; exit 2; }
-    local ids=("$@") id live state
+    (( INTERVAL < 60 )) && INTERVAL=60
+    local ids=("$@") id state
     while :; do
-        for id in "${ids[@]}"; do
-            if ! live=$(LC_ALL=C squeue -h -j "$id" -o '%T' 2>&1); then
-                case "$live" in
-                    *"Invalid job id specified"*) live= ;;
-                    *) continue ;;
-                esac
-            fi
-            if [[ -z $live ]]; then
+        if fresh_snapshot; then
+            for id in "${ids[@]}"; do
+                in_snapshot "$id" && continue
+                # Left the queue, or another user's job the snapshot cannot show.
+                # Only terminal accounting resolves it; sacct lags squeue, so give
+                # it a moment, but never past the deadline.
                 state=
-                # Left the queue. Give sacct a moment to record the outcome.
-                # sacct lags squeue, but not past the deadline: a late answer the
-                # deadline bounds waiting when no terminal record is available.
                 local tries=0
                 while [[ $tries -lt 6 ]] && [[ $(elapsed) -lt $((MAX_BLOCK + 3)) ]]; do
                     state=$(slurm_state "$id")
@@ -117,8 +155,8 @@ await_slurm() {
                 esac
                 emit "{\"event\":\"slurm_terminal\",\"job_id\":\"$id\",\"state\":$(jstr "${st:-UNKNOWN}"),\"exit_code\":$(jstr "${code:-}"),\"elapsed\":$(jstr "${el:-}"),\"waited_s\":$(elapsed)}"
                 return 0
-            fi
-        done
+            done
+        fi
         expired && still_waiting "jobs still queued or running: ${ids[*]}"
         nap
     done

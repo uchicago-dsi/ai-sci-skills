@@ -91,7 +91,7 @@ await-notify --to <stable-pane-id> --mailbox <owner> [options] -- <await-event a
   --bind-owner NAME bind a verified pane to its manager (no event arguments)
   --label TEXT      short human name for the thing being watched
   --timeout S       give up after S seconds total (default 86400)
-  --interval S      seconds between internal polls (default 30)
+  --interval S      seconds between internal polls (default 300)
 ```
 
 ```bash
@@ -133,12 +133,19 @@ await-event file <path>                 path exists and its size stops changing
 await-event pid <pid>                   process exits
 await-event log <path> <regex>          regex appears in newly appended bytes
 await-event cmd <command...>            command exits 0
-  --interval S    seconds between internal polls (default 30)
+  --interval S    seconds between internal polls (default 300)
   --max-block S   give up and report still_waiting after S seconds (default 900)
 ```
 
 It prints one JSON line and nothing before it. Exit 0 fired, 10 still waiting,
 2 usage error.
+
+Slurm watchers on one host share a single `squeue --me` snapshot, refreshed at
+most once per interval (never under 60 s), with one query in flight at a time and
+a 60 s limit on each. A watcher that finds the refresh already running launches
+nothing and waits for its next poll. Before this, each watcher ran its own
+untimed `squeue -j` every 30 s, and on an overloaded controller 27 of them stacked
+hung queries for up to 26 minutes at once.
 
 ### If no watcher is available
 

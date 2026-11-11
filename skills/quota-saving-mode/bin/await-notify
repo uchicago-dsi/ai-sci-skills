@@ -16,7 +16,7 @@
 #   --mailbox AGENT   responsible manager; must match the bound pane owner
 #   --label TEXT      short human name for the thing being watched
 #   --timeout S       give up after S seconds total (default 86400)
-#   --interval S      seconds between internal polls (default 30)
+#   --interval S      seconds between internal polls (default 300)
 #
 # Everything after `--` is passed to await-event, so any event kind it supports
 # works here:
@@ -42,7 +42,7 @@ await-notify --to <tmux-target> --mailbox <owner> [options] -- <await-event args
   --bind-owner NAME bind a verified pane to its manager (no event arguments)
   --label TEXT      short human name for the thing being watched
   --timeout S       give up after S seconds total (default 86400)
-  --interval S      seconds between internal polls (default 30)
+  --interval S      seconds between internal polls (default 300)
 
 Everything after `--` goes to await-event:
   await-notify --to %9 --mailbox mao --label "fan fit" -- slurm 15233526
@@ -55,7 +55,7 @@ USAGE
     exit 2
 }
 
-TARGET= MAILBOX= LABEL= BIND_OWNER= TIMEOUT=86400 INTERVAL=30
+TARGET= MAILBOX= LABEL= BIND_OWNER= TIMEOUT=86400 INTERVAL=300
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --to)       TARGET=${2:?}; shift 2 ;;

@@ -201,6 +201,13 @@ or agent slots. If concurrent maintenance creates a material collision with an a
 scientific owner, a frozen-artifact risk, or a user-only authority question, report
 only that exception and otherwise keep the lanes isolated.
 
+Message other managers only when necessary: when a change needs an owner's
+approval and cannot proceed without it, or when the owner asked for the result.
+Batch questions into one message, and do not chase or send follow-ups. Put
+receipts, FYIs and status in the maintenance notebook, where owners can read them
+when they choose. Maintenance is a side lane; every message spends attention
+another lane needs for its own work (Anna, 2026-11-11).
+
 Deleting what your own change supersedes is not maintenance and is not restricted by
 this rule; see `research-code-parsimony`.
 

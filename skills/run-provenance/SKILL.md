@@ -239,3 +239,12 @@ check.
   commit, or archive. Reassess retained work when its stated use ends.
 - Do not rewrite or forcibly purge history merely to remove obsolete working copies
   or references.
+- Delete a failed run's output root once the run that replaces it has passed, without
+  asking: a root built from a broken mapping, a wrong config or a failed check carries
+  no evidence the passing run lacks, and keeping it beside the good one leaves a later
+  reader to work out which is real. Look first: confirm the failure is recorded (its
+  check output, the notebook or commit message saying why it failed), that nothing
+  live reads from the root, and that it holds no shared model or input a passing run
+  links to. Then delete it, one root per command, and log the deletion where the
+  failure is recorded. A root kept as evidence of the failure itself — a negative
+  result someone will cite — is not a failed run and stays.
